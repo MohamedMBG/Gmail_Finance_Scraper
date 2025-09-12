@@ -454,6 +454,15 @@ def main():
                         help="Password or app password for IMAP login (will prompt if omitted).")
     args = parser.parse_args()
 
+    # Interactive login selection if no method specified via args
+    if not args.email:
+        choice = input(
+            "Choose login method: [1] Automatic via browser link (default) or [2] Manual email/password: "
+        ).strip()
+        if choice == "2":
+            args.email = input("Gmail address: ").strip()
+            args.password = getpass.getpass("Gmail password or app password: ")
+
     try:
         if args.email:
             password = args.password or getpass.getpass("Gmail password or app password: ")
