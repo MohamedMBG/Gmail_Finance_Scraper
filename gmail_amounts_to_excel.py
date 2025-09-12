@@ -11,6 +11,10 @@ import re
 import sys
 import argparse
 import json
+import getpass
+import imaplib
+import email
+from email.header import decode_header, make_header
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -132,6 +136,58 @@ def load_creds_for_account(account: str | None) -> tuple[Credentials, str]:
     p.write_text(creds.to_json())
     return creds, email
 
+# ============== IMAP helpers (direct login) ==============
+def imap_login(email_address: str, password: str) -> imaplib.IMAP4_SSL:
+    """Login to Gmail via IMAP using an email address and password/app password."""
+    imap = imaplib.IMAP4_SSL("imap.gmail.com")
+    imap.login(email_address, password)
+    imap.select("INBOX")
+    return imap
+
+def imap_list_ids(imap: imaplib.IMAP4_SSL, days: int, extra_query: str | None = None):
+    """Return a list of message UIDs matching the Gmail raw query."""
+    q = gmail_query(days, extra_query)
+    typ, data = imap.search(None, "X-GM-RAW", q)
+    if typ != "OK" or not data:
+        return []
+    return data[0].split()
+
+def imap_fetch(imap: imaplib.IMAP4_SSL, uid: bytes):
+    """Fetch a message by UID and return (email.message.Message, gm_id)."""
+    typ, data = imap.fetch(uid, "(RFC822 X-GM-MSGID)")
+    if typ != "OK" or not data:
+        return None, None
+    raw = data[0][1]
+    msg = email.message_from_bytes(raw)
+    gm_match = re.search(rb"X-GM-MSGID\s+(\d+)", data[0][0])
+    gm_id = gm_match.group(1).decode() if gm_match else uid.decode()
+    return msg, gm_id
+
+def decode_imap_body(msg):
+    """Extract text content from an email.message.Message."""
+    if msg.is_multipart():
+        for part in msg.walk():
+            ctype = part.get_content_type()
+            if ctype == "text/plain":
+                try:
+                    return part.get_payload(decode=True).decode(errors="ignore")
+                except Exception:
+                    continue
+            if ctype == "text/html":
+                try:
+                    html = part.get_payload(decode=True).decode(errors="ignore")
+                    return BeautifulSoup(html, "html.parser").get_text("\n", strip=True)
+                except Exception:
+                    continue
+    else:
+        ctype = msg.get_content_type()
+        try:
+            payload = msg.get_payload(decode=True).decode(errors="ignore")
+        except Exception:
+            payload = ""
+        if ctype == "text/html":
+            return BeautifulSoup(payload, "html.parser").get_text("\n", strip=True)
+        return payload
 # ============== Gmail search & parsing ==============
 def gmail_query(days: int, extra_query: str | None = None) -> str:
     or_terms = " OR ".join(f'"{t}"' for t in SEARCH_TERMS)
@@ -392,93 +448,192 @@ def main():
                         help="If multiple amounts in one email: first, max, or all (default: max).")
     parser.add_argument("--account", type=str, default=None,
                         help="Email address of the Google account to use (if you have multiple tokens).")
+    parser.add_argument(
+        "--email",
+        type=str,
+        default=None,
+        help="Direct IMAP login email (if omitted you'll be asked to choose OAuth or manual login)",
+    )
+    parser.add_argument(
+        "--password",
+        type=str,
+        default=None,
+        help="Password or app password for IMAP login (will prompt if omitted)",
+    )
     args = parser.parse_args()
+    # Let the user choose the authentication method if none specified
+    manual_password = None
+    if not args.email:
+        choice = input(
+            "How would you like to authenticate?\n"
+            "  [1] Automatic (open browser link) [default]\n"
+            "  [2] Enter email and password manually\n"
+            "Select 1 or 2: "
+        ).strip()
+        if choice == "2":
+            args.email = input("Gmail address: ").strip()
+            manual_password = getpass.getpass("Gmail password or app password: ")
 
     try:
-        creds, account_email = load_creds_for_account(args.account)
-        print(f"Authorized as: {account_email}")
-        service = build("gmail", "v1", credentials=creds)
+        if args.email:
+            password = manual_password or args.password or getpass.getpass("Gmail password or app password: ")
+            imap = imap_login(args.email, password)
+            msg_ids = imap_list_ids(imap, args.days, args.query)
+            if args.take:
+                msg_ids = msg_ids[:args.take]
 
-        q = gmail_query(args.days, args.query)
-        msg_ids = list_message_ids(service, query=q)
-        if args.take:
-            msg_ids = msg_ids[:args.take]
+            df = load_existing_excel(EXCEL_PATH)
+            existing_ids = set(df["message_id"].astype(str).tolist())
 
-        df = load_existing_excel(EXCEL_PATH)
-        existing_ids = set(df["message_id"].astype(str).tolist())
+            rows = []
+            for uid in msg_ids:
+                msg, gm_id = imap_fetch(imap, uid)
+                if not msg or gm_id in existing_ids:
+                    continue
+                subject = str(make_header(decode_header(msg.get("Subject", ""))))
+                from_h = str(make_header(decode_header(msg.get("From", ""))))
+                date_h = msg.get("Date", "")
+                body_text = decode_imap_body(msg)
+                if is_promotional(body_text, subject):
+                    continue
+                snippet = body_text[:200]
+                sender_name, sender_email = parse_from_header(from_h)
 
-        rows = []
-        for mid in msg_ids:
-            if str(mid) in existing_ids:
-                continue
-            msg = get_message(service, mid)
-            payload = msg.get("payload", {})
-            headers = payload.get("headers", [])
-            subject = header(headers, "Subject")
-            from_h = header(headers, "From")
-            date_h = header(headers, "Date")
-            snippet = msg.get("snippet", "")
+                try:
+                    dt = parsedate_to_datetime(date_h)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                except Exception:
+                    dt = datetime.utcnow().replace(tzinfo=timezone.utc)
+                dt_local = to_local_tz_naive(dt)
 
-            sender_name, sender_email = parse_from_header(from_h)
+                text_for_amounts = f"{subject}\n{body_text}"
+                amts = extract_amounts(text_for_amounts)
+                if not amts:
+                    continue
 
-            # Parse date
-            try:
-                dt = parsedate_to_datetime(date_h)
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-            except Exception:
-                dt = datetime.utcnow().replace(tzinfo=timezone.utc)
-            dt_local = to_local_tz_naive(dt)
+                if args.pick == "first":
+                    chosen = [amts[0]]
+                elif args.pick == "max":
+                    chosen = [max(amts, key=lambda x: x["value"])]
+                else:
+                    chosen = amts
 
-            # Body & smart promo filter
-            body_text = decode_body(payload)
-            if is_promotional(body_text, subject):
-                continue
+                for a in chosen:
+                    rows.append({
+                        "date": dt_local.replace(microsecond=0),
+                        "sender_name": sender_name,
+                        "sender_email": sender_email,
+                        "subject": subject,
+                        "amount_value": a["value"],
+                        "amount_currency": a["currency"],
+                        "amount_raw": a["raw"],
+                        "message_id": gm_id,
+                        "snippet": snippet,
+                        "gmail_link": gmail_link(gm_id),
+                        "account_email": args.email,
+                    })
 
-            text_for_amounts = f"{subject}\n{body_text}"
-            amts = extract_amounts(text_for_amounts)
-            if not amts:
-                continue
+            if rows:
+                out = pd.DataFrame(rows)
+                out["date"] = pd.to_datetime(out["date"], errors="coerce")
 
-            if args.pick == "first":
-                chosen = [amts[0]]
-            elif args.pick == "max":
-                chosen = [max(amts, key=lambda x: x["value"])]
+                merged = pd.concat([df, out], ignore_index=True)
+                merged.drop_duplicates(subset=["message_id", "amount_raw"], keep="first", inplace=True)
+                merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
+                merged.sort_values(by="date", ascending=False, inplace=True)
+
+                merged.to_excel(EXCEL_PATH, index=False)
+                style_excel(EXCEL_PATH)
+
+                print(f"✅ Wrote {len(merged) - len(df)} new row(s) to {EXCEL_PATH}. Total rows: {len(merged)}")
+                print(f"✨ Styled Excel saved to: {EXCEL_PATH}")
             else:
-                chosen = amts  # all
+                print("No new emails with amounts found (based on your query).")
 
-            for a in chosen:
-                rows.append({
-                    "date": dt_local.replace(microsecond=0),
-                    "sender_name": sender_name,
-                    "sender_email": sender_email,
-                    "subject": subject,
-                    "amount_value": a["value"],
-                    "amount_currency": a["currency"],
-                    "amount_raw": a["raw"],
-                    "message_id": mid,
-                    "snippet": snippet,
-                    "gmail_link": gmail_link(mid),
-                    "account_email": account_email,
-                })
-
-        if rows:
-            out = pd.DataFrame(rows)
-            out["date"] = pd.to_datetime(out["date"], errors="coerce")
-
-            merged = pd.concat([df, out], ignore_index=True)
-            merged.drop_duplicates(subset=["message_id", "amount_raw"], keep="first", inplace=True)
-            merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
-            merged.sort_values(by="date", ascending=False, inplace=True)
-
-            merged.to_excel(EXCEL_PATH, index=False)
-            # Apply pretty styling
-            style_excel(EXCEL_PATH)
-
-            print(f"✅ Wrote {len(merged) - len(df)} new row(s) to {EXCEL_PATH}. Total rows: {len(merged)}")
-            print(f"✨ Styled Excel saved to: {EXCEL_PATH}")
+            imap.logout()
         else:
-            print("No new emails with amounts found (based on your query).")
+            creds, account_email = load_creds_for_account(args.account)
+            print(f"Authorized as: {account_email}")
+            service = build("gmail", "v1", credentials=creds)
+
+            q = gmail_query(args.days, args.query)
+            msg_ids = list_message_ids(service, query=q)
+            if args.take:
+                msg_ids = msg_ids[:args.take]
+
+            df = load_existing_excel(EXCEL_PATH)
+            existing_ids = set(df["message_id"].astype(str).tolist())
+
+            rows = []
+            for mid in msg_ids:
+                if str(mid) in existing_ids:
+                    continue
+                msg = get_message(service, mid)
+                payload = msg.get("payload", {})
+                headers = payload.get("headers", [])
+                subject = header(headers, "Subject")
+                from_h = header(headers, "From")
+                date_h = header(headers, "Date")
+                snippet = msg.get("snippet", "")
+
+                sender_name, sender_email = parse_from_header(from_h)
+
+                try:
+                    dt = parsedate_to_datetime(date_h)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                except Exception:
+                    dt = datetime.utcnow().replace(tzinfo=timezone.utc)
+                dt_local = to_local_tz_naive(dt)
+
+                body_text = decode_body(payload)
+                if is_promotional(body_text, subject):
+                    continue
+
+                text_for_amounts = f"{subject}\n{body_text}"
+                amts = extract_amounts(text_for_amounts)
+                if not amts:
+                    continue
+
+                if args.pick == "first":
+                    chosen = [amts[0]]
+                elif args.pick == "max":
+                    chosen = [max(amts, key=lambda x: x["value"])]
+                else:
+                    chosen = amts  # all
+
+                for a in chosen:
+                    rows.append({
+                        "date": dt_local.replace(microsecond=0),
+                        "sender_name": sender_name,
+                        "sender_email": sender_email,
+                        "subject": subject,
+                        "amount_value": a["value"],
+                        "amount_currency": a["currency"],
+                        "amount_raw": a["raw"],
+                        "message_id": mid,
+                        "snippet": snippet,
+                        "gmail_link": gmail_link(mid),
+                        "account_email": account_email,
+                    })
+
+            if rows:
+                out = pd.DataFrame(rows)
+                out["date"] = pd.to_datetime(out["date"], errors="coerce")
+
+                merged = pd.concat([df, out], ignore_index=True)
+                merged.drop_duplicates(subset=["message_id", "amount_raw"], keep="first", inplace=True)
+                merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
+                merged.sort_values(by="date", ascending=False, inplace=True)
+
+                merged.to_excel(EXCEL_PATH, index=False)
+                style_excel(EXCEL_PATH)
+
+                print(f"✅ Wrote {len(merged) - len(df)} new row(s) to {EXCEL_PATH}. Total rows: {len(merged)}")
+                print(f"✨ Styled Excel saved to: {EXCEL_PATH}")
+            else:
+                print("No new emails with amounts found (based on your query).")
 
     except HttpError as e:
         print(f"Gmail API error: {e}")
