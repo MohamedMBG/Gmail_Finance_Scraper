@@ -14,9 +14,16 @@ def home(request):
     """Display results and allow the user to run the scraper."""
     context = {}
     if request.method == "POST":
-        # Run the scraping script; errors are propagated to the user
-        subprocess.run(["python", str(SCRIPT_PATH)], check=True)
-        return redirect("home")
+        try:
+            subprocess.run(
+                ["python", str(SCRIPT_PATH)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return redirect("home")
+        except subprocess.CalledProcessError as exc:
+            context["error"] = exc.stderr or exc.stdout or str(exc)
 
     if EXCEL_PATH.exists():
         df = pd.read_excel(EXCEL_PATH)
