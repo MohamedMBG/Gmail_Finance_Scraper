@@ -1,6 +1,7 @@
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
+google-auth
 beautifulsoup4
 pandas
 openpyxl
