@@ -47,7 +47,8 @@ SCOPES = [
 TOKENS_DIR = Path(__file__).parent / "tokens"
 TOKENS_DIR.mkdir(exist_ok=True)
 
-CREDS_FILE = Path(__file__).parent / "credentials.json"
+# Credentials file lives at the repository root
+CREDS_FILE = Path(__file__).resolve().parents[2] / "credentials.json"
 
 SEARCH_TERMS = ["montant", "amount", "devis", "facture", "quotation", "invoice", "payment", "paid", "balance", "due"]
 EXCEL_PATH = "email_amounts.xlsx"
@@ -648,6 +649,10 @@ def main():
     parser.add_argument("--password", type=str, default=None,
                         help="Password or app password for IMAP login (will prompt if omitted).")
     args = parser.parse_args()
+
+    if not args.email and not CREDS_FILE.exists():
+        print(f"Google API credentials file not found: {CREDS_FILE}")
+        sys.exit(1)
 
     if not args.email:
         choice = input(
