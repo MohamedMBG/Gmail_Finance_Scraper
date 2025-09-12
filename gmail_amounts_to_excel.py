@@ -50,7 +50,7 @@ TOKENS_DIR.mkdir(exist_ok=True)
 CREDS_FILE = Path(__file__).parent / "credentials.json"
 
 SEARCH_TERMS = ["montant", "amount", "devis", "facture", "quotation", "invoice", "payment", "paid", "balance", "due"]
-EXCEL_PATH = "email_amounts.xlsx"
+EXCEL_PATH = Path(__file__).with_name("email_amounts.xlsx")
 
 # Currency & amount patterns:
 CURRENCY_SYM = r"(?:€|\$|£|د\.?\s?م\.?|MAD|DHS?|Dh?s?)"
@@ -371,6 +371,14 @@ THIN_BORDER = Border(
     bottom=Side(style="thin", color="DDDDDD"),
 )
 
+# Light fills for different currencies so the Excel sheet is easier to scan
+CURRENCY_FILL = {
+    "USD": "D9EAD3",   # light green
+    "EUR": "D0E0E3",   # light blue
+    "GBP": "FCE5CD",   # light orange
+    "MAD": "F4CCCC",   # light red/pink
+}
+
 def best_fit_width(values, min_w=10, max_w=60):
     try:
         lengths = [len(str(v)) for v in values if v is not None]
@@ -430,6 +438,15 @@ def style_excel(path, sheet_name="Sheet1", make_table=True):
             col = col_map[name]
             for row in range(2, ws.max_row + 1):
                 ws.cell(row=row, column=col).alignment = Alignment(wrap_text=True, vertical="top")
+
+    # Give currency cells a light fill so users can visually separate currencies
+    if "amount_currency" in col_map:
+        col = col_map["amount_currency"]
+        for row in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row, column=col)
+            color = CURRENCY_FILL.get(str(cell.value).upper())
+            if color:
+                cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
 
     # Borders + column widths
     data = list(ws.iter_rows(values_only=True))

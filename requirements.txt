@@ -5,3 +5,4 @@ beautifulsoup4
 pandas
 openpyxl
 python-dateutil
+Django>=4.2
