@@ -1,13 +1,12 @@
-import subprocess
 from pathlib import Path
 
-import pandas as pd
 from django.http import FileResponse, HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import render
+
+from gmail_amounts_to_excel import run_scraper
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 EXCEL_PATH = BASE_DIR.parent / "email_amounts.xlsx"
-SCRIPT_PATH = BASE_DIR.parent / "gmail_amounts_to_excel.py"
 
 
 def home(request):
@@ -15,19 +14,11 @@ def home(request):
     context = {}
     if request.method == "POST":
         try:
-            subprocess.run(
-                ["python", str(SCRIPT_PATH)],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            return redirect("home")
-        except subprocess.CalledProcessError as exc:
-            context["error"] = exc.stderr or exc.stdout or str(exc)
-
-    if EXCEL_PATH.exists():
-        df = pd.read_excel(EXCEL_PATH)
-        context["table_html"] = df.to_html(classes="table table-striped", index=False)
+            df = run_scraper()
+            if not df.empty:
+                context["table_html"] = df.to_html(classes="table table-striped", index=False)
+        except Exception as exc:
+            context["error"] = str(exc)
     return render(request, "scraper/home.html", context)
 
 

@@ -471,38 +471,17 @@ def style_excel(path, sheet_name="Sheet1", make_table=True):
 
     wb.save(path)
 
-# ===================== MAIN =====================
-def main():
-    parser = argparse.ArgumentParser(description="Extract email amounts into Excel (multi-account safe)")
-    parser.add_argument("--days", type=int, default=180, help="Search in the last N days. 0 = all mail.")
-    parser.add_argument("--query", type=str, default=None, help="Extra Gmail search query")
-    parser.add_argument("--take", type=int, default=None, help="Stop after processing this many messages (testing).")
-    parser.add_argument("--pick", choices=["first", "max", "all"], default="max",
-                        help="If multiple amounts in one email: first, max, or all (default: max).")
-    parser.add_argument("--account", type=str, default=None,
-                        help="Email address of the Google account to use (if you have multiple tokens).")
-    parser.add_argument("--email", type=str, default=None,
-                        help="Use direct IMAP login with this email instead of OAuth.")
-    parser.add_argument("--password", type=str, default=None,
-                        help="Password or app password for IMAP login (will prompt if omitted).")
-    args = parser.parse_args()
-
-    # Interactive login selection if no method specified via args
-    if not args.email:
-        choice = input(
-            "Choose login method: [1] Automatic via browser link (default) or [2] Manual email/password: "
-        ).strip()
-        if choice == "2":
-            args.email = input("Gmail address: ").strip()
-            args.password = getpass.getpass("Gmail password or app password: ")
-
+# ===================== SCRAPER ENTRY POINT =====================
+def run_scraper(days=180, query=None, take=None, pick="max", account=None, email=None, password=None):
+    """Run the scraper logic and return a DataFrame with the results."""
     try:
-        if args.email:
-            password = args.password or getpass.getpass("Gmail password or app password: ")
-            imap = imap_login(args.email, password)
-            msg_ids = imap_list_ids(imap, args.days, args.query)
-            if args.take:
-                msg_ids = msg_ids[:args.take]
+        if email:
+            if not password:
+                raise ValueError("Password is required when using direct IMAP login")
+            imap = imap_login(email, password)
+            msg_ids = imap_list_ids(imap, days, query)
+            if take:
+                msg_ids = msg_ids[:take]
 
             df = load_existing_excel(EXCEL_PATH)
             existing_ids = set(df["message_id"].astype(str).tolist())
@@ -536,9 +515,9 @@ def main():
                 if not amts:
                     continue
 
-                if args.pick == "first":
+                if pick == "first":
                     chosen = [amts[0]]
-                elif args.pick == "max":
+                elif pick == "max":
                     chosen = [max(amts, key=lambda x: x["value"])]
                 else:
                     chosen = amts
@@ -555,36 +534,29 @@ def main():
                         "message_id": gm_id,
                         "snippet": snippet,
                         "gmail_link": gmail_link(gm_id),
-                        "account_email": args.email,
+                        "account_email": email,
                     })
 
             if rows:
                 out = pd.DataFrame(rows)
                 out["date"] = pd.to_datetime(out["date"], errors="coerce")
-
                 merged = pd.concat([df, out], ignore_index=True)
                 merged.drop_duplicates(subset=["message_id", "amount_raw"], keep="first", inplace=True)
                 merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
                 merged.sort_values(by="date", ascending=False, inplace=True)
-
                 merged.to_excel(EXCEL_PATH, index=False)
                 style_excel(EXCEL_PATH)
-
-                print(f"✅ Wrote {len(merged) - len(df)} new row(s) to {EXCEL_PATH}. Total rows: {len(merged)}")
-                print(f"✨ Styled Excel saved to: {EXCEL_PATH}")
             else:
-                print("No new emails with amounts found (based on your query).")
-
+                merged = df
             imap.logout()
         else:
-            creds, account_email = load_creds_for_account(args.account)
-            print(f"Authorized as: {account_email}")
+            creds, account_email = load_creds_for_account(account)
             service = build("gmail", "v1", credentials=creds)
 
-            q = gmail_query(args.days, args.query)
+            q = gmail_query(days, query)
             msg_ids = list_message_ids(service, query=q)
-            if args.take:
-                msg_ids = msg_ids[:args.take]
+            if take:
+                msg_ids = msg_ids[:take]
 
             df = load_existing_excel(EXCEL_PATH)
             existing_ids = set(df["message_id"].astype(str).tolist())
@@ -622,9 +594,9 @@ def main():
                 if not amts:
                     continue
 
-                if args.pick == "first":
+                if pick == "first":
                     chosen = [amts[0]]
-                elif args.pick == "max":
+                elif pick == "max":
                     chosen = [max(amts, key=lambda x: x["value"])]
                 else:
                     chosen = amts  # all
@@ -647,26 +619,53 @@ def main():
             if rows:
                 out = pd.DataFrame(rows)
                 out["date"] = pd.to_datetime(out["date"], errors="coerce")
-
                 merged = pd.concat([df, out], ignore_index=True)
                 merged.drop_duplicates(subset=["message_id", "amount_raw"], keep="first", inplace=True)
                 merged["date"] = pd.to_datetime(merged["date"]).dt.tz_localize(None)
                 merged.sort_values(by="date", ascending=False, inplace=True)
-
                 merged.to_excel(EXCEL_PATH, index=False)
                 style_excel(EXCEL_PATH)
-
-                print(f"✅ Wrote {len(merged) - len(df)} new row(s) to {EXCEL_PATH}. Total rows: {len(merged)}")
-                print(f"✨ Styled Excel saved to: {EXCEL_PATH}")
             else:
-                print("No new emails with amounts found (based on your query).")
+                merged = df
+        return merged
+    except HttpError as e:
+        raise e
+    except Exception as e:
+        raise e
 
+
+def main():
+    parser = argparse.ArgumentParser(description="Extract email amounts into Excel (multi-account safe)")
+    parser.add_argument("--days", type=int, default=180, help="Search in the last N days. 0 = all mail.")
+    parser.add_argument("--query", type=str, default=None, help="Extra Gmail search query")
+    parser.add_argument("--take", type=int, default=None, help="Stop after processing this many messages (testing).")
+    parser.add_argument("--pick", choices=["first", "max", "all"], default="max",
+                        help="If multiple amounts in one email: first, max, or all (default: max).")
+    parser.add_argument("--account", type=str, default=None,
+                        help="Email address of the Google account to use (if you have multiple tokens).")
+    parser.add_argument("--email", type=str, default=None,
+                        help="Use direct IMAP login with this email instead of OAuth.")
+    parser.add_argument("--password", type=str, default=None,
+                        help="Password or app password for IMAP login (will prompt if omitted).")
+    args = parser.parse_args()
+
+    if not args.email:
+        choice = input(
+            "Choose login method: [1] Automatic via browser link (default) or [2] Manual email/password: "
+        ).strip()
+        if choice == "2":
+            args.email = input("Gmail address: ").strip()
+            args.password = getpass.getpass("Gmail password or app password: ")
+
+    try:
+        run_scraper(**vars(args))
     except HttpError as e:
         print(f"Gmail API error: {e}")
         sys.exit(1)
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
