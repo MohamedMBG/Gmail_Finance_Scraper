@@ -81,6 +81,7 @@ PROMO_KEYWORDS = [
 BLOCKED_SENDERS = [
     "reddit",
     "discord",
+    "naga.com",
 ]
 
 
@@ -472,6 +473,39 @@ def style_excel(path, sheet_name="Sheet1", make_table=True):
 
     wb.save(path)
 
+
+def write_totals_sheet(path: str | Path, df: pd.DataFrame) -> None:
+    """Write a totals sheet (sum of amounts per currency) to the workbook."""
+    totals = (
+        df.groupby("amount_currency")["amount_value"].sum().reset_index()
+        if not df.empty
+        else pd.DataFrame(columns=["amount_currency", "amount_value"])
+    )
+
+    with pd.ExcelWriter(path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+        totals.to_excel(writer, sheet_name="totals", index=False)
+
+    wb = load_workbook(path)
+    ws = wb["totals"]
+
+    # Style header
+    if ws.max_row >= 1:
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+            cell.fill = HEADER_FILL
+            cell.border = THIN_BORDER
+
+    # Format amount column and borders
+    for row in range(2, ws.max_row + 1):
+        ws.cell(row=row, column=2).number_format = '#,##0.00'
+        for col in range(1, ws.max_column + 1):
+            ws.cell(row=row, column=col).border = THIN_BORDER
+
+    last_col_letter = ws.cell(row=1, column=ws.max_column).column_letter
+    ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+
+    wb.save(path)
+
 # ===================== SCRAPER ENTRY POINT =====================
 def run_scraper(days=180, query=None, take=None, pick="max", account=None, email=None, password=None):
     """Run the scraper logic and return a DataFrame with the results."""
@@ -547,6 +581,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 merged.sort_values(by="date", ascending=False, inplace=True)
                 merged.to_excel(EXCEL_PATH, index=False)
                 style_excel(EXCEL_PATH)
+                write_totals_sheet(EXCEL_PATH, merged)
             else:
                 merged = df
             imap.logout()
@@ -626,6 +661,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 merged.sort_values(by="date", ascending=False, inplace=True)
                 merged.to_excel(EXCEL_PATH, index=False)
                 style_excel(EXCEL_PATH)
+                write_totals_sheet(EXCEL_PATH, merged)
             else:
                 merged = df
         return merged
