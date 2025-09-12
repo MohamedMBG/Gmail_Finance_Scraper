@@ -76,6 +76,18 @@ PROMO_KEYWORDS = [
     "exclusive", "coupon", "save %", "sale", "clearance"
 ]
 
+# Email senders to ignore completely (substring match on the domain/email)
+BLOCKED_SENDERS = [
+    "reddit",
+    "discord",
+]
+
+
+def is_blocked_sender(sender_email: str) -> bool:
+    """Return True if sender_email contains any blocked sender term."""
+    s = sender_email.lower()
+    return any(term in s for term in BLOCKED_SENDERS)
+
 # ============== OAuth helpers (multi-account) ==============
 def account_token_path(email: str) -> Path:
     safe = email.replace("@", "_at_").replace(".", "_")
@@ -191,13 +203,17 @@ def decode_imap_body(msg):
 # ============== Gmail search & parsing ==============
 def gmail_query(days: int, extra_query: str | None = None) -> str:
     or_terms = " OR ".join(f'"{t}"' for t in SEARCH_TERMS)
-    exclusions = (
-        "-category:promotions "
-        "-category:social "
-        "-from:(noreply OR no-reply) "
-        "-(subject:newsletter OR unsubscribe OR offer OR promotion OR deal OR sale OR discount)"
-    )
-    q = f"({or_terms}) {exclusions}"
+
+    exclusions = [
+        "-category:promotions",
+        "-category:social",
+        "-from:(noreply OR no-reply)",
+        "-(subject:newsletter OR unsubscribe OR offer OR promotion OR deal OR sale OR discount)",
+    ]
+    if BLOCKED_SENDERS:
+        exclusions.append("-from:(" + " OR ".join(BLOCKED_SENDERS) + ")")
+
+    q = f"({or_terms}) {' '.join(exclusions)}"
     if days is not None and days > 0:
         q += f" newer_than:{days}d"
     if extra_query:
@@ -487,6 +503,8 @@ def main():
                     continue
                 snippet = body_text[:200]
                 sender_name, sender_email = parse_from_header(from_h)
+                if is_blocked_sender(sender_email):
+                    continue
 
                 try:
                     dt = parsedate_to_datetime(date_h)
@@ -567,6 +585,8 @@ def main():
                 snippet = msg.get("snippet", "")
 
                 sender_name, sender_email = parse_from_header(from_h)
+                if is_blocked_sender(sender_email):
+                    continue
 
                 try:
                     dt = parsedate_to_datetime(date_h)
