@@ -8,16 +8,24 @@
 <body class="container py-4">
     <h1 class="mb-4">Gmail Finance Scraper</h1>
     <div class="mb-3">
-        <a href="{% url 'logout' %}" class="btn btn-secondary">Log Out</a>
+        {% if connected %}
+            <a href="{% url 'logout' %}" class="btn btn-secondary">Log Out</a>
+        {% else %}
+            <a href="{% url 'login' %}" class="btn btn-primary">Log In</a>
+        {% endif %}
     </div>
     {% if error %}
         <div class="alert alert-danger" role="alert">{{ error }}</div>
     {% endif %}
-    <form method="post" class="mb-3">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary">Run Scraper</button>
-        <a href="{% url 'download_excel' %}" class="btn btn-success">Download Excel</a>
-    </form>
+    {% if connected %}
+        <form method="post" class="mb-3">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">Run Scraper</button>
+            <a href="{% url 'download_excel' %}" class="btn btn-success">Download Excel</a>
+        </form>
+    {% else %}
+        <p>Please log in to run the scraper.</p>
+    {% endif %}
     {% if table_html %}
         <h2>Latest Results</h2>
         {{ table_html|safe }}
