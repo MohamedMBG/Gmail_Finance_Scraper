@@ -3,7 +3,7 @@ from pathlib import Path
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import render
 
-from gmail_amounts_to_excel import run_scraper
+from .gmail_amounts_to_excel import run_scraper
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 EXCEL_PATH = BASE_DIR.parent / "email_amounts.xlsx"
