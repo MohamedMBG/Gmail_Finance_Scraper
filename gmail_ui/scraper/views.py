@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from django.http import FileResponse, HttpResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.contrib.auth import logout
 
 from .gmail_amounts_to_excel import run_scraper
 
@@ -26,3 +27,9 @@ def download_excel(request):
     if EXCEL_PATH.exists():
         return FileResponse(open(EXCEL_PATH, "rb"), as_attachment=True, filename="email_amounts.xlsx")
     return HttpResponse("File not found", status=404)
+
+
+def logout_view(request):
+    """Log the user out and redirect to the home page."""
+    logout(request)
+    return redirect("home")

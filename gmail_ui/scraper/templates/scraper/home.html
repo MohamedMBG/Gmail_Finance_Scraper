@@ -7,6 +7,9 @@
 </head>
 <body class="container py-4">
     <h1 class="mb-4">Gmail Finance Scraper</h1>
+    <div class="mb-3">
+        <a href="{% url 'logout' %}" class="btn btn-secondary">Log Out</a>
+    </div>
     {% if error %}
         <div class="alert alert-danger" role="alert">{{ error }}</div>
     {% endif %}
