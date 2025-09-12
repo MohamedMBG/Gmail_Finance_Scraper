@@ -28,6 +28,8 @@ def home(request):
                 df = run_scraper()
                 if not df.empty:
                     context["table_html"] = df.to_html(classes="table table-striped", index=False)
+                    totals = df.groupby("amount_currency")["amount_value"].sum().reset_index()
+                    context["totals_html"] = totals.to_html(classes="table table-striped", index=False)
             except Exception as exc:
                 context["error"] = str(exc)
     return render(request, "scraper/home.html", context)
