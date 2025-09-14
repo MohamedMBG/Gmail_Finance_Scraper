@@ -11,6 +11,30 @@ EXCEL_PATH = BASE_DIR.parent / "email_amounts.xlsx"
 TOKENS_DIR = Path(__file__).resolve().parent / "tokens"
 
 
+def classify_service(subject: str) -> str:
+    """Return a coarse service category based on the email subject."""
+    if not subject:
+        return "Other"
+    s = subject.lower()
+    if any(k in s for k in ["invoice", "facture"]):
+        return "Invoice"
+    if any(k in s for k in ["quote", "devis", "quotation"]):
+        return "Quote"
+    if any(k in s for k in ["payment", "paiement", "paid"]):
+        return "Payment"
+    return "Other"
+
+
+def extract_project(subject: str) -> str:
+    """Heuristically extract a project name from the email subject."""
+    if not subject:
+        return "Unknown"
+    for sep in [" - ", " – ", ":"]:
+        if sep in subject:
+            part = subject.split(sep, 1)[1].strip()
+            return part or "Unknown"
+    return subject.strip()
+
 def is_connected() -> bool:
     """Return True if an OAuth token file exists."""
     return any(TOKENS_DIR.glob("token-*.json"))
@@ -30,6 +54,36 @@ def home(request):
                     context["table_html"] = df.to_html(classes="table table-striped", index=False)
                     totals = df.groupby("amount_currency")["amount_value"].sum().reset_index()
                     context["totals_html"] = totals.to_html(classes="table table-striped", index=False)
+
+                    df["service"] = df["subject"].apply(classify_service)
+                    df["project"] = df["subject"].apply(extract_project)
+
+                    clients = (
+                        df.groupby("sender_name")["amount_value"].sum()
+                        .reset_index()
+                        .sort_values("amount_value", ascending=False)
+                    )
+                    context["clients_html"] = clients.to_html(
+                        classes="table table-striped", index=False
+                    )
+
+                    projects = (
+                        df.groupby("project")["amount_value"].sum()
+                        .reset_index()
+                        .sort_values("amount_value", ascending=False)
+                    )
+                    context["projects_html"] = projects.to_html(
+                        classes="table table-striped", index=False
+                    )
+
+                    services = (
+                        df.groupby("service")["amount_value"].sum()
+                        .reset_index()
+                        .sort_values("amount_value", ascending=False)
+                    )
+                    context["services_html"] = services.to_html(
+                        classes="table table-striped", index=False
+                    )
             except Exception as exc:
                 context["error"] = str(exc)
     return render(request, "scraper/home.html", context)

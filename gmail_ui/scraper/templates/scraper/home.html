@@ -33,8 +33,20 @@
         <h2 class="mt-4">Total Amounts</h2>
         {{ totals_html|safe }}
         {% endif %}
-    {% else %}
+        {% if projects_html %}
+        <h2 class="mt-4">Projects</h2>
+        {{ projects_html|safe }}
+        {% endif %}
+        {% if clients_html %}
+        <h2 class="mt-4">Clients by Revenue</h2>
+        {{ clients_html|safe }}
+        {% endif %}
+        {% if services_html %}
+        <h2 class="mt-4">Services by Revenue</h2>
+        {{ services_html|safe }}
+        {% endif %}
+        {% else %}
         <p>No data available yet.</p>
-    {% endif %}
+        {% endif %}
 </body>
 </html>
