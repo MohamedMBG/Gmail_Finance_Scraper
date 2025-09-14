@@ -87,11 +87,29 @@ BLOCKED_SENDERS = [
     "naga.com",
 ]
 
+# Keywords used to roughly categorize what service an email refers to. The
+# keywords are intentionally broad so we can match simple variations of the
+# service names (e.g. "advertising", "advertisement", "promo").
+SERVICE_KEYWORDS = {
+    "photography": ["photo", "picture", "photoshoot", "photography"],
+    "filming": ["film", "filming", "video", "recording"],
+    "advertising": ["advertis", "marketing", "promo", "campaign"],
+}
+
 
 def is_blocked_sender(sender_email: str) -> bool:
     """Return True if sender_email contains any blocked sender term."""
     s = sender_email.lower()
     return any(term in s for term in BLOCKED_SENDERS)
+
+
+def detect_service(text: str) -> str:
+    """Very simple keyword-based classifier for the service mentioned in text."""
+    lower = text.lower()
+    for service, keywords in SERVICE_KEYWORDS.items():
+        if any(k in lower for k in keywords):
+            return service
+    return "unknown"
 
 # ============== OAuth helpers (multi-account) ==============
 def account_token_path(email: str) -> Path:
@@ -348,6 +366,7 @@ def empty_results_df():
         "snippet": pd.Series(dtype="object"),
         "gmail_link": pd.Series(dtype="object"),
         "account_email": pd.Series(dtype="object"),
+        "service": pd.Series(dtype="object"),
     })
 
 def load_existing_excel(path):
@@ -355,6 +374,8 @@ def load_existing_excel(path):
         try:
             df = pd.read_excel(path)
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            if "service" not in df.columns:
+                df["service"] = ""
             return df
         except Exception:
             pass
@@ -515,6 +536,18 @@ def write_totals_sheet(path: str | Path, df: pd.DataFrame) -> None:
 
     wb.save(path)
 
+
+# ---------- Simple analytics ----------
+def most_profitable_service(df: pd.DataFrame) -> str | None:
+    """Return the service with the highest total amount in the dataframe."""
+    if df.empty or "service" not in df.columns:
+        return None
+    totals = df.groupby("service")["amount_value"].sum().sort_values(ascending=False)
+    if totals.empty:
+        return None
+    return totals.index[0]
+
+
 # ===================== SCRAPER ENTRY POINT =====================
 def run_scraper(days=180, query=None, take=None, pick="max", account=None, email=None, password=None):
     """Run the scraper logic and return a DataFrame with the results."""
@@ -555,6 +588,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 dt_local = to_local_tz_naive(dt)
 
                 text_for_amounts = f"{subject}\n{body_text}"
+                service = detect_service(text_for_amounts)
                 amts = extract_amounts(text_for_amounts)
                 if not amts:
                     continue
@@ -579,6 +613,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                         "snippet": snippet,
                         "gmail_link": gmail_link(gm_id),
                         "account_email": email,
+                        "service": service,
                     })
 
             if rows:
@@ -635,6 +670,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     continue
 
                 text_for_amounts = f"{subject}\n{body_text}"
+                service = detect_service(text_for_amounts)
                 amts = extract_amounts(text_for_amounts)
                 if not amts:
                     continue
@@ -659,6 +695,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                         "snippet": snippet,
                         "gmail_link": gmail_link(mid),
                         "account_email": account_email,
+                        "service": service,
                     })
 
             if rows:
@@ -673,6 +710,9 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 write_totals_sheet(EXCEL_PATH, merged)
             else:
                 merged = df
+        top_service = most_profitable_service(merged)
+        if top_service:
+            print(f"Most profitable service: {top_service}")
         return merged
     except HttpError as e:
         raise e
