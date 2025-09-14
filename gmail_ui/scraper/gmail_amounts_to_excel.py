@@ -56,8 +56,11 @@ EXCEL_PATH = "email_amounts.xlsx"
 # Currency & amount patterns:
 CURRENCY_SYM = r"(?:€|\$|£|د\.?\s?م\.?|MAD|DHS?|Dh?s?)"
 NUM = r"(?:\d{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)"
+# Allow optional sign before currency or amount
 AMOUNT_REGEX = re.compile(
-    rf"(?:{CURRENCY_SYM}\s*{NUM}|{NUM}\s*{CURRENCY_SYM}|{NUM}\s*(?:USD|EUR|GBP|MAD))",
+    rf"(?:[-+]?\s*{CURRENCY_SYM}\s*{NUM}|[-+]?{NUM}\s*{CURRENCY_SYM}|"
+    rf"[-+]?{NUM}\s*(?:USD|EUR|GBP|MAD)|"
+    rf"(?:USD|EUR|GBP|MAD)\s*[-+]?{NUM})",
     re.IGNORECASE
 )
 
@@ -286,7 +289,9 @@ def normalize_currency(raw):
     return ""
 
 def value_from_amount(raw):
-    m = re.findall(r"[\d.,\s]+", raw)
+    # Strip out non-numeric characters except separators and sign
+    cleaned = re.sub(r"[^0-9.,\s\-+]", "", raw)
+    m = re.findall(r"[-+]?\d[\d.,\s]*", cleaned)
     if not m:
         return None
     num = m[0].strip().replace(" ", "")
