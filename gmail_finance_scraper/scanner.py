@@ -8,10 +8,7 @@ gmail_amounts_to_excel_multi.py
 import base64
 import os
 import re
-import sys
-import argparse
 import json
-import getpass
 import imaplib
 import email
 from email.header import decode_header, make_header
@@ -48,7 +45,7 @@ TOKENS_DIR = Path(__file__).parent / "tokens"
 TOKENS_DIR.mkdir(exist_ok=True)
 
 # Credentials file lives at the repository root
-CREDS_FILE = Path(__file__).resolve().parents[2] / "credentials.json"
+CREDS_FILE = Path.cwd() / "credentials.json"
 
 SEARCH_TERMS = ["montant", "amount", "devis", "facture", "quotation", "invoice", "payment", "paid", "balance", "due"]
 EXCEL_PATH = "email_amounts.xlsx"
@@ -507,8 +504,21 @@ def write_totals_sheet(path: str | Path, df: pd.DataFrame) -> None:
     wb.save(path)
 
 # ===================== SCRAPER ENTRY POINT =====================
-def run_scraper(days=180, query=None, take=None, pick="max", account=None, email=None, password=None):
+def run_scraper(
+    days: int = 180,
+    query: str | None = None,
+    take: int | None = None,
+    pick: str = "max",
+    account: str | None = None,
+    email: str | None = None,
+    password: str | None = None,
+    exclude_labels: list[str] | None = None,
+    min_amount: float | None = None,
+):
     """Run the scraper logic and return a DataFrame with the results."""
+    if exclude_labels:
+        excl = " ".join(f"-label:{lbl}" for lbl in exclude_labels)
+        query = f"{query or ''} {excl}".strip()
     try:
         if email:
             if not password:
@@ -558,6 +568,8 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     chosen = amts
 
                 for a in chosen:
+                    if min_amount and a["value"] < min_amount:
+                        continue
                     rows.append({
                         "date": dt_local.replace(microsecond=0),
                         "sender_name": sender_name,
@@ -638,6 +650,8 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     chosen = amts  # all
 
                 for a in chosen:
+                    if min_amount and a["value"] < min_amount:
+                        continue
                     rows.append({
                         "date": dt_local.replace(microsecond=0),
                         "sender_name": sender_name,
@@ -671,42 +685,4 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
         raise e
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Extract email amounts into Excel (multi-account safe)")
-    parser.add_argument("--days", type=int, default=180, help="Search in the last N days. 0 = all mail.")
-    parser.add_argument("--query", type=str, default=None, help="Extra Gmail search query")
-    parser.add_argument("--take", type=int, default=None, help="Stop after processing this many messages (testing).")
-    parser.add_argument("--pick", choices=["first", "max", "all"], default="max",
-                        help="If multiple amounts in one email: first, max, or all (default: max).")
-    parser.add_argument("--account", type=str, default=None,
-                        help="Email address of the Google account to use (if you have multiple tokens).")
-    parser.add_argument("--email", type=str, default=None,
-                        help="Use direct IMAP login with this email instead of OAuth.")
-    parser.add_argument("--password", type=str, default=None,
-                        help="Password or app password for IMAP login (will prompt if omitted).")
-    args = parser.parse_args()
 
-    if not args.email and not CREDS_FILE.exists():
-        print(f"Google API credentials file not found: {CREDS_FILE}")
-        sys.exit(1)
-
-    if not args.email:
-        choice = input(
-            "Choose login method: [1] Automatic via browser link (default) or [2] Manual email/password: "
-        ).strip()
-        if choice == "2":
-            args.email = input("Gmail address: ").strip()
-            args.password = getpass.getpass("Gmail password or app password: ")
-
-    try:
-        run_scraper(**vars(args))
-    except HttpError as e:
-        print(f"Gmail API error: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

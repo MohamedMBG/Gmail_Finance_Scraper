@@ -1,0 +1,23 @@
+[project]
+name = "gmail-finance-scraper"
+version = "0.1.0"
+description = "Extract monetary amounts from Gmail into spreadsheets"
+authors = [{name = "Example Author"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "google-api-python-client",
+    "google-auth-httplib2",
+    "google-auth-oauthlib",
+    "google-auth",
+    "beautifulsoup4",
+    "pandas",
+    "openpyxl",
+    "python-dateutil",
+    "typer",
+    "streamlit",
+]
+
+[project.scripts]
+gfs = "gmail_finance_scraper.cli:app"
