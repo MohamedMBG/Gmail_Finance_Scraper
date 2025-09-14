@@ -190,31 +190,6 @@
         </div>
     </section>
     {% endif %}
-    {% if tools_html %}
-    <!-- Tools Section -->
-    <section>
-        <div class="row">
-            <div class="col-lg-6 mb-4 mb-lg-0">
-                <div class="card h-100">
-                    <div class="card-header">Tools by Revenue</div>
-                    <div class="card-body table-responsive">
-                        {{ tools_html|safe }}
-                    </div>
-                </div>
-            </div>
-            {% if top_tool %}
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-header">Top Tool</div>
-                    <div class="card-body d-flex align-items-center justify-content-center">
-                        <p class="mb-0">{{ top_tool.tool }}: {{ top_tool.amount_value|floatformat:2 }}</p>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </section>
-    {% endif %}
     {% else %}
     <section>
         <div class="alert alert-warning" role="alert">No data available yet.</div>
