@@ -36,6 +36,13 @@ def extract_project(subject: str) -> str:
             return part or "Unknown"
     return subject.strip()
 
+
+def extract_tool(sender_email: str) -> str:
+    """Return a simplified tool name from the sender's email domain."""
+    if not sender_email:
+        return "Unknown"
+    return sender_email.split("@")[-1].lower()
+
 def is_connected() -> bool:
     """Return True if an OAuth token file exists."""
     return any(TOKENS_DIR.glob("token-*.json"))
@@ -101,6 +108,18 @@ def home(request):
                             "values": services["amount_value"].tolist(),
                         }
                     )
+
+                    df["tool"] = df["sender_email"].apply(extract_tool)
+                    tools = (
+                        df.groupby("tool")["amount_value"].sum()
+                        .reset_index()
+                        .sort_values("amount_value", ascending=False)
+                    )
+                    context["tools_html"] = tools.to_html(
+                        classes="table table-striped table-hover", index=False
+                    )
+                    if not tools.empty:
+                        context["top_tool"] = tools.iloc[0].to_dict()
             except Exception as exc:
                 context["error"] = str(exc)
     return render(request, "scraper/home.html", context)
