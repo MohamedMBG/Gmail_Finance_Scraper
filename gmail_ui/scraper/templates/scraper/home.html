@@ -2,18 +2,22 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Gmail Finance Scraper</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+    </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
   <div class="container-fluid">
     <a class="navbar-brand" href="#">Gmail Finance Scraper</a>
     <div class="d-flex">
       {% if connected %}
-        <a href="{% url 'logout' %}" class="btn btn-outline-light">Log Out</a>
+        <a href="{% url 'logout' %}" class="btn btn-outline-primary">Log Out</a>
       {% else %}
-        <a href="{% url 'login' %}" class="btn btn-outline-light">Log In</a>
+        <a href="{% url 'login' %}" class="btn btn-outline-primary">Log In</a>
       {% endif %}
     </div>
   </div>
@@ -24,58 +28,82 @@
         <div class="alert alert-danger" role="alert">{{ error }}</div>
     {% endif %}
     {% if connected %}
-        <form method="post" class="mb-4">
+        <form method="post" class="mb-4 d-flex flex-wrap gap-2">
             {% csrf_token %}
             <button type="submit" class="btn btn-primary">Run Scraper</button>
             <a href="{% url 'download_excel' %}" class="btn btn-success">Download Excel</a>
         </form>
     {% else %}
-        <p>Please log in to run the scraper.</p>
+        <div class="alert alert-info" role="alert">Please log in to run the scraper.</div>
     {% endif %}
 
     {% if table_html %}
-        <div class="mb-4">
-            <h2>Latest Results</h2>
-            {{ table_html|safe }}
+        <div class="card mb-4">
+            <div class="card-header">Latest Results</div>
+            <div class="card-body table-responsive">
+                {{ table_html|safe }}
+            </div>
         </div>
         {% if totals_html %}
-        <div class="mb-4">
-            <h2>Total Amounts</h2>
-            {{ totals_html|safe }}
+        <div class="card mb-4">
+            <div class="card-header">Total Amounts</div>
+            <div class="card-body table-responsive">
+                {{ totals_html|safe }}
+            </div>
         </div>
         {% endif %}
         {% if projects_html %}
-        <div class="mb-4">
-            <h2>Projects</h2>
-            {{ projects_html|safe }}
+        <div class="card mb-4">
+            <div class="card-header">Projects</div>
+            <div class="card-body table-responsive">
+                {{ projects_html|safe }}
+            </div>
         </div>
         {% endif %}
 
         {% if clients_html %}
         <div class="row mb-4">
-            <div class="col-md-6">
-                <h2>Clients by Revenue</h2>
-                {{ clients_html|safe }}
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <div class="card h-100">
+                    <div class="card-header">Clients by Revenue</div>
+                    <div class="card-body table-responsive">
+                        {{ clients_html|safe }}
+                    </div>
+                </div>
             </div>
-            <div class="col-md-6">
-                <canvas id="clientsChart" height="200"></canvas>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">Clients Chart</div>
+                    <div class="card-body">
+                        <canvas id="clientsChart" height="200"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
         {% endif %}
 
         {% if services_html %}
         <div class="row mb-4">
-            <div class="col-md-6">
-                <h2>Services by Revenue</h2>
-                {{ services_html|safe }}
+            <div class="col-lg-6 mb-4 mb-lg-0">
+                <div class="card h-100">
+                    <div class="card-header">Services by Revenue</div>
+                    <div class="card-body table-responsive">
+                        {{ services_html|safe }}
+                    </div>
+                </div>
             </div>
-            <div class="col-md-6">
-                <canvas id="servicesChart" height="200"></canvas>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">Services Chart</div>
+                    <div class="card-body">
+                        <canvas id="servicesChart" height="200"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
         {% endif %}
     {% else %}
-        <p>No data available yet.</p>
+        <div class="alert alert-warning" role="alert">No data available yet.</div>
     {% endif %}
 </div>
 
