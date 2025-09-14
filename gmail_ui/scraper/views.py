@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import redirect, render
@@ -66,6 +67,12 @@ def home(request):
                     context["clients_html"] = clients.to_html(
                         classes="table table-striped", index=False
                     )
+                    context["clients_chart"] = json.dumps(
+                        {
+                            "labels": clients["sender_name"].tolist(),
+                            "values": clients["amount_value"].tolist(),
+                        }
+                    )
 
                     projects = (
                         df.groupby("project")["amount_value"].sum()
@@ -83,6 +90,12 @@ def home(request):
                     )
                     context["services_html"] = services.to_html(
                         classes="table table-striped", index=False
+                    )
+                    context["services_chart"] = json.dumps(
+                        {
+                            "labels": services["service"].tolist(),
+                            "values": services["amount_value"].tolist(),
+                        }
                     )
             except Exception as exc:
                 context["error"] = str(exc)
