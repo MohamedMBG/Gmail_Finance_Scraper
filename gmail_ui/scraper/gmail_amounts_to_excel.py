@@ -588,7 +588,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 dt_local = to_local_tz_naive(dt)
 
                 text_for_amounts = f"{subject}\n{body_text}"
-                service = detect_service(text_for_amounts)
+                service_type = detect_service(text_for_amounts)
                 amts = extract_amounts(text_for_amounts)
                 if not amts:
                     continue
@@ -613,7 +613,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                         "snippet": snippet,
                         "gmail_link": gmail_link(gm_id),
                         "account_email": email,
-                        "service": service,
+                        "service": service_type,
                     })
 
             if rows:
@@ -670,7 +670,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     continue
 
                 text_for_amounts = f"{subject}\n{body_text}"
-                service = detect_service(text_for_amounts)
+                service_type = detect_service(text_for_amounts)
                 amts = extract_amounts(text_for_amounts)
                 if not amts:
                     continue
@@ -695,7 +695,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                         "snippet": snippet,
                         "gmail_link": gmail_link(mid),
                         "account_email": account_email,
-                        "service": service,
+                        "service": service_type,
                     })
 
             if rows:
