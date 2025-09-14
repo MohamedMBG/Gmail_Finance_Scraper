@@ -213,7 +213,15 @@ new Chart(document.getElementById('clientsChart'), {
             backgroundColor: 'rgba(247,164,0,0.7)'
         }]
     },
-    options: { animation: false, scales: { y: { beginAtZero: true } } }
+    options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Revenue' } },
+            x: { title: { display: true, text: 'Client' } }
+        }
+    }
 });
 {% endif %}
 
@@ -231,7 +239,7 @@ const servicesData = JSON.parse('{{ services_chart|escapejs }}');
                 ]
             }]
         },
-        options: { animation: false }
+        options: { animation: false, responsive: true, maintainAspectRatio: false }
     });
 {% endif %}
 </script>
