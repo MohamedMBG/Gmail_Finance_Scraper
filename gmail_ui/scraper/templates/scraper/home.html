@@ -115,6 +115,22 @@
         {% endif %}
     </section>
 
+    <!-- Gamification Section -->
+    <section>
+        <div class="card mb-4">
+            <div class="card-header">Your Progress</div>
+            <div class="card-body">
+                <p class="mb-1">Runs: {{ run_count }}</p>
+                <p class="mb-1">Points: {{ points }}</p>
+                {% if badge %}
+                <p class="mb-3">Badge: {{ badge }}</p>
+                {% endif %}
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar" role="progressbar" style="width: {{ progress }}%;" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    </section>
 
     {% if table_html %}
     <!-- Data Tables Section -->

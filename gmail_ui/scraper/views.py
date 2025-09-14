@@ -45,6 +45,7 @@ def is_connected() -> bool:
 def home(request):
     """Display results and allow the user to run the scraper."""
     connected = is_connected()
+    run_count = request.session.get("run_count", 0)
     context = {"connected": connected}
     if request.method == "POST":
         if not connected:
@@ -102,9 +103,19 @@ def home(request):
                             "values": services["amount_value"].tolist(),
                         }
                     )
-
+                run_count += 1
+                request.session["run_count"] = run_count
             except Exception as exc:
                 context["error"] = str(exc)
+    context["run_count"] = run_count
+    context["points"] = run_count * 10
+    if run_count >= 10:
+        context["badge"] = "Scraper Master"
+    elif run_count >= 5:
+        context["badge"] = "Scraper Apprentice"
+    elif run_count >= 1:
+        context["badge"] = "Scraper Novice"
+    context["progress"] = min(run_count, 10) * 10
     return render(request, "scraper/home.html", context)
 
 
