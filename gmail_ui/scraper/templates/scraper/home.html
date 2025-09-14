@@ -5,50 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Gmail Finance Scraper</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
-            --color-black: #000000;
-            --color-navy: #0c1832;
-            --color-orange: #f7a400;
-            --color-gray: #e6e6e6;
+            --color-primary: #16a34a;
+            --color-secondary: #1e293b;
+            --color-bg: #f1f5f9;
             --color-white: #ffffff;
-            --color-dark-gray: #4d4d4d;
         }
 
         body {
-            background-color: var(--color-gray);
-            color: var(--color-black);
+            background-color: var(--color-bg);
+            color: var(--color-secondary);
         }
 
-        .navbar {
-            background-color: var(--color-navy) !important;
+        .sidebar {
+            width: 220px;
+            min-height: 100vh;
+            background-color: var(--color-secondary);
+            color: var(--color-white);
         }
 
-        .navbar-brand,
-        .navbar .nav-link {
-            color: var(--color-white) !important;
+        .sidebar .nav-link {
+            color: var(--color-white);
+        }
+
+        .sidebar .nav-link.active {
+            background-color: var(--color-primary);
+            color: var(--color-secondary);
+        }
+
+        .topbar {
+            background-color: var(--color-white);
         }
 
         .btn-primary {
-            background-color: var(--color-orange);
-            border-color: var(--color-orange);
-            color: var(--color-black);
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+            color: var(--color-secondary);
         }
 
         .btn-primary:hover {
-            background-color: #e08e00;
-            border-color: #e08e00;
+            background-color: #15803d;
+            border-color: #15803d;
             color: var(--color-white);
         }
 
         .btn-success {
-            background-color: var(--color-navy);
-            border-color: var(--color-navy);
+            background-color: var(--color-secondary);
+            border-color: var(--color-secondary);
         }
 
         .btn-success:hover {
-            background-color: #081224;
-            border-color: #081224;
+            background-color: #111827;
+            border-color: #111827;
         }
 
         .card {
@@ -58,8 +68,12 @@
         }
 
         .card-header {
-            background-color: var(--color-navy);
+            background-color: var(--color-secondary);
             color: var(--color-white);
+        }
+
+        .progress-bar {
+            background-color: var(--color-primary);
         }
 
         section {
@@ -79,140 +93,146 @@
     </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark border-bottom">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">Gmail Finance Scraper</a>
-    <div class="d-flex">
-      {% if connected %}
-        <a href="{% url 'logout' %}" class="btn btn-outline-primary">Log Out</a>
-      {% else %}
-        <a href="{% url 'login' %}" class="btn btn-outline-primary">Log In</a>
-      {% endif %}
-    </div>
-  </div>
-</nav>
-
-<div class="container my-4">
-    {% if error %}
-        <div class="alert alert-danger" role="alert">{{ error }}</div>
-    {% endif %}
-
-    <!-- Actions Section -->
-    <section>
-        {% if connected %}
-        <div class="card">
-            <div class="card-header">Actions</div>
-            <div class="card-body">
-                <form method="post" class="d-flex flex-wrap gap-2">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">Run Scraper</button>
-                    <a href="{% url 'download_excel' %}" class="btn btn-success">Download Excel</a>
-                </form>
-            </div>
-        </div>
-        {% else %}
-        <div class="alert alert-info" role="alert">Please log in to run the scraper.</div>
-        {% endif %}
-    </section>
-
-    <!-- Gamification Section -->
-    <section>
-        <div class="card mb-4">
-            <div class="card-header">Your Progress</div>
-            <div class="card-body">
-                <p class="mb-1">Runs: {{ run_count }}</p>
-                <p class="mb-1">Points: {{ points }}</p>
-                {% if badge %}
-                <p class="mb-3">Badge: {{ badge }}</p>
+<div class="d-flex">
+    <nav class="sidebar d-flex flex-column p-3">
+        <div class="fs-4 mb-4">Gmail Finance</div>
+        <ul class="nav nav-pills flex-column mb-auto">
+            <li class="nav-item"><a href="#" class="nav-link active">Dashboard</a></li>
+        </ul>
+    </nav>
+    <div class="flex-grow-1">
+        <div class="topbar d-flex justify-content-between align-items-center p-3 border-bottom">
+            <h1 class="h5 mb-0">Dashboard</h1>
+            <div>
+                {% if connected %}
+                    <a href="{% url 'logout' %}" class="btn btn-primary">Log Out</a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-primary">Log In</a>
                 {% endif %}
-                <div class="progress" style="height: 20px;">
-                    <div class="progress-bar" role="progressbar" style="width: {{ progress }}%;" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
             </div>
         </div>
-    </section>
+        <div class="container-fluid my-4">
+            {% if error %}
+                <div class="alert alert-danger" role="alert">{{ error }}</div>
+            {% endif %}
 
-    {% if table_html %}
-    <!-- Data Tables Section -->
-    <section>
-        <div class="card mb-4">
-            <div class="card-header">Latest Results</div>
-            <div class="card-body table-responsive">
-                {{ table_html|safe }}
-            </div>
-        </div>
-        {% if totals_html %}
-        <div class="card mb-4">
-            <div class="card-header">Total Amounts</div>
-            <div class="card-body table-responsive">
-                {{ totals_html|safe }}
-            </div>
-        </div>
-        {% endif %}
-        {% if projects_html %}
-        <div class="card mb-4">
-            <div class="card-header">Projects</div>
-            <div class="card-body table-responsive">
-                {{ projects_html|safe }}
-            </div>
-        </div>
-        {% endif %}
-    </section>
-
-    {% if clients_html %}
-    <!-- Clients Section -->
-    <section>
-        <div class="row">
-            <div class="col-lg-6 mb-4 mb-lg-0">
-                <div class="card h-100">
-                    <div class="card-header">Clients by Revenue</div>
-                    <div class="card-body table-responsive">
-                        {{ clients_html|safe }}
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-header">Clients Chart</div>
+            <!-- Actions Section -->
+            <section>
+                {% if connected %}
+                <div class="card">
+                    <div class="card-header">Actions</div>
                     <div class="card-body">
-                        <canvas id="clientsChart" height="200"></canvas>
+                        <form method="post" class="d-flex flex-wrap gap-2">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">Run Scraper</button>
+                            <a href="{% url 'download_excel' %}" class="btn btn-success">Download Excel</a>
+                        </form>
                     </div>
                 </div>
-            </div>
-        </div>
-    </section>
-    {% endif %}
+                {% else %}
+                <div class="alert alert-info" role="alert">Please log in to run the scraper.</div>
+                {% endif %}
+            </section>
 
-    {% if services_html %}
-    <!-- Services Section -->
-    <section>
-        <div class="row">
-            <div class="col-lg-6 mb-4 mb-lg-0">
-                <div class="card h-100">
-                    <div class="card-header">Services by Revenue</div>
-                    <div class="card-body table-responsive">
-                        {{ services_html|safe }}
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="card h-100">
-                    <div class="card-header">Services Chart</div>
+            <!-- Gamification Section -->
+            <section>
+                <div class="card mb-4">
+                    <div class="card-header">Your Progress</div>
                     <div class="card-body">
-                        <canvas id="servicesChart" height="200"></canvas>
+                        <p class="mb-1">Runs: {{ run_count }}</p>
+                        <p class="mb-1">Points: {{ points }}</p>
+                        {% if badge %}
+                        <p class="mb-3">Badge: {{ badge }}</p>
+                        {% endif %}
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar" role="progressbar" style="width: {{ progress }}%;" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
+
+            {% if table_html %}
+            <!-- Data Tables Section -->
+            <section>
+                <div class="card mb-4">
+                    <div class="card-header">Latest Results</div>
+                    <div class="card-body table-responsive">
+                        {{ table_html|safe }}
+                    </div>
+                </div>
+                {% if totals_html %}
+                <div class="card mb-4">
+                    <div class="card-header">Total Amounts</div>
+                    <div class="card-body table-responsive">
+                        {{ totals_html|safe }}
+                    </div>
+                </div>
+                {% endif %}
+                {% if projects_html %}
+                <div class="card mb-4">
+                    <div class="card-header">Projects</div>
+                    <div class="card-body table-responsive">
+                        {{ projects_html|safe }}
+                    </div>
+                </div>
+                {% endif %}
+            </section>
+
+            {% if clients_html %}
+            <!-- Clients Section -->
+            <section>
+                <div class="row">
+                    <div class="col-lg-6 mb-4 mb-lg-0">
+                        <div class="card h-100">
+                            <div class="card-header">Clients by Revenue</div>
+                            <div class="card-body table-responsive">
+                                {{ clients_html|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header">Clients Chart</div>
+                            <div class="card-body">
+                                <canvas id="clientsChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if services_html %}
+            <!-- Services Section -->
+            <section>
+                <div class="row">
+                    <div class="col-lg-6 mb-4 mb-lg-0">
+                        <div class="card h-100">
+                            <div class="card-header">Services by Revenue</div>
+                            <div class="card-body table-responsive">
+                                {{ services_html|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header">Services Chart</div>
+                            <div class="card-body">
+                                <canvas id="servicesChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+            {% else %}
+            <section>
+                <div class="alert alert-warning" role="alert">No data available yet.</div>
+            </section>
+            {% endif %}
         </div>
-    </section>
-    {% endif %}
-    {% else %}
-    <section>
-        <div class="alert alert-warning" role="alert">No data available yet.</div>
-    </section>
-    {% endif %}
+    </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% if clients_chart or services_chart %}
@@ -226,7 +246,7 @@ new Chart(document.getElementById('clientsChart'), {
         datasets: [{
             label: 'Revenue',
             data: clientsData.values,
-            backgroundColor: 'rgba(247,164,0,0.7)'
+            backgroundColor: 'rgba(22,163,74,0.7)'
         }]
     },
     options: {
@@ -243,23 +263,22 @@ new Chart(document.getElementById('clientsChart'), {
 
 {% if services_chart %}
 const servicesData = JSON.parse('{{ services_chart|escapejs }}');
-    new Chart(document.getElementById('servicesChart'), {
-        type: 'pie',
-        data: {
-            labels: servicesData.labels,
-            datasets: [{
-                data: servicesData.values,
-                backgroundColor: [
-                    '#f7a400','#0c1832','#e6e6e6','#000000','#4d4d4d',
-                    '#f7a400','#0c1832','#e6e6e6','#000000','#4d4d4d'
-                ]
-            }]
-        },
-        options: { animation: false, responsive: true, maintainAspectRatio: false }
-    });
+new Chart(document.getElementById('servicesChart'), {
+    type: 'pie',
+    data: {
+        labels: servicesData.labels,
+        datasets: [{
+            data: servicesData.values,
+            backgroundColor: [
+                '#16a34a','#1e293b','#f1f5f9','#ffffff','#9ca3af',
+                '#16a34a','#1e293b','#f1f5f9','#ffffff','#9ca3af'
+            ]
+        }]
+    },
+    options: { animation: false, responsive: true, maintainAspectRatio: false }
+});
 {% endif %}
 </script>
 {% endif %}
 </body>
 </html>
-
