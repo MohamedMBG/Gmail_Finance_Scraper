@@ -299,7 +299,11 @@ def value_from_amount(raw):
             num = num.replace(",", "")
     else:
         if "," in num and "." not in num:
-            num = num.replace(",", ".")
+            parts = num.split(",")
+            if len(parts[-1]) == 3 and all(len(p) == 3 for p in parts[1:]):
+                num = "".join(parts)
+            else:
+                num = num.replace(",", ".")
     try:
         return float(num)
     except ValueError:
