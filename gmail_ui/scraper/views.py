@@ -109,7 +109,10 @@ def home(request):
                             "values": services["amount_value"].tolist(),
                         }
                     )
-                    total_amount += df["amount_value"].sum()
+                    # Each run should reflect only the current month's total, not a
+                    # cumulative sum across runs.  Replace the session value with the
+                    # freshly computed total rather than adding to it.
+                    total_amount = df["amount_value"].sum()
                     request.session["total_amount"] = total_amount
             except Exception as exc:
                 context["error"] = str(exc)
