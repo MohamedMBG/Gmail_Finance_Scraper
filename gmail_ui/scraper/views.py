@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+from datetime import date
 
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import redirect, render
@@ -45,8 +46,13 @@ def is_connected() -> bool:
 def home(request):
     """Display results and allow the user to run the scraper."""
     connected = is_connected()
+    today = date.today()
+    current_period = today.strftime("%Y-%m")
+    if request.session.get("period") != current_period:
+        request.session["period"] = current_period
+        request.session["total_amount"] = 0.0
     total_amount = request.session.get("total_amount", 0.0)
-    context = {"connected": connected}
+    context = {"connected": connected, "period": current_period}
     if request.method == "POST":
         if not connected:
             context["error"] = "Please log in first."
@@ -109,9 +115,11 @@ def home(request):
                 context["error"] = str(exc)
     context["total_amount"] = total_amount
     badge_thresholds = [
-        ("Money Novice", 10000, "fa-solid fa-coins", "#f97316"),
-        ("Money Expert", 30000, "fa-solid fa-gem", "#0ea5e9"),
-        ("Money Master", 40000, "fa-solid fa-crown", "#eab308"),
+        ("Bronze", 5000, "fa-solid fa-medal", "#cd7f32"),
+        ("Silver", 10000, "fa-solid fa-award", "#c0c0c0"),
+        ("Gold", 20000, "fa-solid fa-trophy", "#ffd700"),
+        ("Platinum", 30000, "fa-solid fa-crown", "#e5e4e2"),
+        ("Diamond", 50000, "fa-solid fa-gem", "#b9f2ff"),
     ]
     badges = []
     current_badge = None
