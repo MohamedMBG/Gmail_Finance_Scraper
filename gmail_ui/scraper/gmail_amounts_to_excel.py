@@ -312,7 +312,7 @@ def value_from_amount(raw):
     m = re.findall(r"[-+]?\d[\d.,\s]*", cleaned)
     if not m:
         return None
-    num = m[0].strip().replace(" ", "")
+    num = re.sub(r"\s+", "", m[0])
     if "," in num and "." in num:
         last_comma = num.rfind(",")
         last_dot = num.rfind(".")
