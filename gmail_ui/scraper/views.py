@@ -45,7 +45,7 @@ def is_connected() -> bool:
 def home(request):
     """Display results and allow the user to run the scraper."""
     connected = is_connected()
-    run_count = request.session.get("run_count", 0)
+    total_amount = request.session.get("total_amount", 0.0)
     context = {"connected": connected}
     if request.method == "POST":
         if not connected:
@@ -103,19 +103,26 @@ def home(request):
                             "values": services["amount_value"].tolist(),
                         }
                     )
-                run_count += 1
-                request.session["run_count"] = run_count
+                    total_amount += df["amount_value"].sum()
+                    request.session["total_amount"] = total_amount
             except Exception as exc:
                 context["error"] = str(exc)
-    context["run_count"] = run_count
-    context["points"] = run_count * 10
-    if run_count >= 10:
-        context["badge"] = "Scraper Master"
-    elif run_count >= 5:
-        context["badge"] = "Scraper Apprentice"
-    elif run_count >= 1:
-        context["badge"] = "Scraper Novice"
-    context["progress"] = min(run_count, 10) * 10
+    context["total_amount"] = total_amount
+    if total_amount >= 40000:
+        context["badge"] = "Money Master"
+        context["next_target"] = None
+        context["progress"] = 100
+    elif total_amount >= 30000:
+        context["badge"] = "Money Expert"
+        context["next_target"] = 40000
+        context["progress"] = (total_amount - 30000) / 10000 * 100
+    elif total_amount >= 10000:
+        context["badge"] = "Money Novice"
+        context["next_target"] = 30000
+        context["progress"] = (total_amount - 10000) / 20000 * 100
+    else:
+        context["next_target"] = 10000
+        context["progress"] = total_amount / 10000 * 100
     return render(request, "scraper/home.html", context)
 
 

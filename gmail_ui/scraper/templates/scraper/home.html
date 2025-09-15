@@ -200,10 +200,12 @@
                 <div class="card mb-4">
                     <div class="card-header">Your Progress</div>
                     <div class="card-body">
-                        <p class="mb-1">Runs: {{ run_count }}</p>
-                        <p class="mb-1">Points: {{ points }}</p>
+                        <p class="mb-1">Total Amount: {{ total_amount }}</p>
                         {% if badge %}
-                        <p class="mb-3">Badge: {{ badge }}</p>
+                        <p class="mb-1">Badge: {{ badge }}</p>
+                        {% endif %}
+                        {% if next_target %}
+                        <p class="mb-3">Next Target: {{ next_target }} dhs</p>
                         {% endif %}
                         <div class="progress" style="height: 20px;">
                             <div class="progress-bar" role="progressbar" style="width: {{ progress }}%;" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100"></div>
