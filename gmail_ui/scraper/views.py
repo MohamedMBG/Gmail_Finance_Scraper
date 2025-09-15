@@ -109,17 +109,17 @@ def home(request):
                 context["error"] = str(exc)
     context["total_amount"] = total_amount
     badge_thresholds = [
-        ("Money Novice", 10000),
-        ("Money Expert", 30000),
-        ("Money Master", 40000),
+        ("Money Novice", 10000, "fa-solid fa-coins", "#f97316"),
+        ("Money Expert", 30000, "fa-solid fa-gem", "#0ea5e9"),
+        ("Money Master", 40000, "fa-solid fa-crown", "#eab308"),
     ]
     badges = []
     current_badge = None
     next_badge = None
     next_target = None
-    for name, threshold in badge_thresholds:
+    for name, threshold, icon, color in badge_thresholds:
         unlocked = total_amount >= threshold
-        badges.append({"name": name, "unlocked": unlocked})
+        badges.append({"name": name, "unlocked": unlocked, "icon": icon, "color": color})
         if unlocked:
             current_badge = name
         elif not next_badge:

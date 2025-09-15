@@ -143,6 +143,15 @@
         }
         .table { width: 100%; word-wrap: break-word; table-layout: fixed; }
         .card-body.table-responsive { overflow-x: auto; }
+        .badge-grid { display:flex; flex-wrap:wrap; gap:1rem; }
+        .achievement-badge {
+            width:100px; height:120px; border-radius:0.75rem; color:#fff;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            font-weight:600; text-align:center; background:var(--badge-color,#6b7280);
+            box-shadow:0 2px 4px rgba(0,0,0,0.15);
+        }
+        .achievement-badge i { font-size:2rem; margin-bottom:0.25rem; }
+        .achievement-badge.locked { filter:grayscale(1); opacity:0.5; }
     </style>
 </head>
 <body>
@@ -200,9 +209,12 @@
                         {% if badge %}
                         <p class="mb-1">Current Badge: {{ badge }}</p>
                         {% endif %}
-                        <div class="d-flex flex-wrap gap-2 mb-2">
+                        <div class="badge-grid mb-2">
                             {% for b in badges %}
-                            <span class="badge {% if b.unlocked %}bg-success{% else %}bg-secondary{% endif %}">{{ b.name }}</span>
+                            <div class="achievement-badge {% if not b.unlocked %}locked{% endif %}" style="--badge-color: {{ b.color }};">
+                                <i class="{{ b.icon }}"></i>
+                                <div class="badge-title">{{ b.name }}</div>
+                            </div>
                             {% endfor %}
                         </div>
                         {% if next_target %}
