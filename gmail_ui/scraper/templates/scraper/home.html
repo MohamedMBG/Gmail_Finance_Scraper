@@ -19,49 +19,6 @@
             color: var(--color-secondary);
         }
 
-        .sidebar {
-            width: 220px;
-            min-height: 100vh;
-            background-color: var(--color-secondary);
-            color: var(--color-white);
-            transition: transform .3s ease;
-        }
-
-        @media (max-width: 992px) {
-            .sidebar {
-                position: fixed;
-                z-index: 1040;
-                transform: translateX(-100%);
-            }
-
-            .sidebar.show {
-                transform: translateX(0);
-            }
-        }
-
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1030;
-        }
-
-        .sidebar-overlay.show {
-            display: block;
-        }
-
-        .sidebar .nav-link {
-            color: var(--color-white);
-        }
-
-        .sidebar .nav-link.active {
-            background-color: var(--color-primary);
-            color: var(--color-secondary);
-        }
 
         .topbar {
             background-color: var(--color-white);
@@ -128,11 +85,6 @@
             --color-white: #1e293b;
         }
 
-        body.dark .sidebar {
-            background-color: var(--color-white);
-            color: var(--color-secondary);
-        }
-
         body.dark .topbar {
             background-color: var(--color-white);
         }
@@ -155,17 +107,9 @@
     </style>
 </head>
 <body>
-<div class="d-flex">
-    <nav class="sidebar d-flex flex-column p-3" id="sidebar">
-        <div class="fs-4 mb-4">Gmail Finance</div>
-        <ul class="nav nav-pills flex-column mb-auto">
-            <li class="nav-item"><a href="#" class="nav-link active">Dashboard</a></li>
-        </ul>
-    </nav>
-    <div class="flex-grow-1">
+    <div>
         <div class="topbar d-flex justify-content-between align-items-center p-3 border-bottom">
             <div class="d-flex align-items-center">
-                <button class="btn btn-link d-lg-none me-2" id="sidebarToggle"><i class="fa fa-bars"></i></button>
                 <h1 class="h5 mb-0">Dashboard</h1>
             </div>
             <div class="d-flex align-items-center">
@@ -309,8 +253,6 @@
             {% endif %}
         </div>
     </div>
-</div>
-<div class="sidebar-overlay" id="sidebarOverlay"></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% if clients_chart or services_chart %}
@@ -359,26 +301,7 @@ new Chart(document.getElementById('servicesChart'), {
 </script>
 {% endif %}
 <script>
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebar = document.getElementById('sidebar');
-    const sidebarOverlay = document.getElementById('sidebarOverlay');
     const themeToggle = document.getElementById('themeToggle');
-
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('show');
-            sidebarOverlay.classList.toggle('show');
-            localStorage.setItem('sidebar', sidebar.classList.contains('show') ? 'open' : 'closed');
-        });
-    }
-
-    if (sidebarOverlay) {
-        sidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.remove('show');
-            sidebarOverlay.classList.remove('show');
-            localStorage.setItem('sidebar', 'closed');
-        });
-    }
 
     function updateThemeIcon() {
         const icon = themeToggle.querySelector('i');
@@ -390,7 +313,7 @@ new Chart(document.getElementById('servicesChart'), {
             icon.classList.add('fa-moon');
         }
     }
-
+    
     themeToggle.addEventListener('click', () => {
         document.body.classList.toggle('dark');
         localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
@@ -405,12 +328,6 @@ new Chart(document.getElementById('servicesChart'), {
             }
         } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.body.classList.add('dark');
-        }
-
-        const savedSidebar = localStorage.getItem('sidebar');
-        if (savedSidebar === 'open') {
-            sidebar.classList.add('show');
-            sidebarOverlay.classList.add('show');
         }
 
         updateThemeIcon();
