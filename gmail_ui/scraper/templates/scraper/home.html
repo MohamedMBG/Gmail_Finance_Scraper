@@ -101,10 +101,6 @@
             color: var(--color-white);
         }
 
-        .progress-bar {
-            background-color: var(--color-primary);
-        }
-
         .chart-container {
             position: relative;
             width: 100%;
@@ -198,18 +194,20 @@
             <!-- Gamification Section -->
             <section>
                 <div class="card mb-4">
-                    <div class="card-header">Your Progress</div>
+                    <div class="card-header">Achievements</div>
                     <div class="card-body">
                         <p class="mb-1">Total Amount: {{ total_amount }}</p>
                         {% if badge %}
-                        <p class="mb-1">Badge: {{ badge }}</p>
+                        <p class="mb-1">Current Badge: {{ badge }}</p>
                         {% endif %}
-                        {% if next_target %}
-                        <p class="mb-3">Next Target: {{ next_target }} dhs</p>
-                        {% endif %}
-                        <div class="progress" style="height: 20px;">
-                            <div class="progress-bar" role="progressbar" style="width: {{ progress }}%;" aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="d-flex flex-wrap gap-2 mb-2">
+                            {% for b in badges %}
+                            <span class="badge {{ 'bg-success' if b.unlocked else 'bg-secondary' }}">{{ b.name }}</span>
+                            {% endfor %}
                         </div>
+                        {% if next_target %}
+                        <p class="mb-0">Next Target: {{ next_target }} dhs to unlock {{ next_badge }}</p>
+                        {% endif %}
                     </div>
                 </div>
             </section>

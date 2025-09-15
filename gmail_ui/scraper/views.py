@@ -108,21 +108,27 @@ def home(request):
             except Exception as exc:
                 context["error"] = str(exc)
     context["total_amount"] = total_amount
-    if total_amount >= 40000:
-        context["badge"] = "Money Master"
-        context["next_target"] = None
-        context["progress"] = 100
-    elif total_amount >= 30000:
-        context["badge"] = "Money Expert"
-        context["next_target"] = 40000
-        context["progress"] = (total_amount - 30000) / 10000 * 100
-    elif total_amount >= 10000:
-        context["badge"] = "Money Novice"
-        context["next_target"] = 30000
-        context["progress"] = (total_amount - 10000) / 20000 * 100
-    else:
-        context["next_target"] = 10000
-        context["progress"] = total_amount / 10000 * 100
+    badge_thresholds = [
+        ("Money Novice", 10000),
+        ("Money Expert", 30000),
+        ("Money Master", 40000),
+    ]
+    badges = []
+    current_badge = None
+    next_badge = None
+    next_target = None
+    for name, threshold in badge_thresholds:
+        unlocked = total_amount >= threshold
+        badges.append({"name": name, "unlocked": unlocked})
+        if unlocked:
+            current_badge = name
+        elif not next_badge:
+            next_badge = name
+            next_target = threshold
+    context["badge"] = current_badge
+    context["badges"] = badges
+    context["next_target"] = next_target
+    context["next_badge"] = next_badge
     return render(request, "scraper/home.html", context)
 
 
