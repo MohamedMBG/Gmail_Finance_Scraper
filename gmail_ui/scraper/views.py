@@ -55,11 +55,11 @@ def home(request):
                 df = run_scraper()
                 if not df.empty:
                     context["table_html"] = df.to_html(
-                        classes="table table-striped table-hover", index=False
+                        classes="table table-striped table-hover table-sm w-100", index=False
                     )
                     totals = df.groupby("amount_currency")["amount_value"].sum().reset_index()
                     context["totals_html"] = totals.to_html(
-                        classes="table table-striped table-hover", index=False
+                        classes="table table-striped table-hover table-sm w-100", index=False
                     )
 
                     df["service"] = df["subject"].apply(classify_service)
@@ -71,7 +71,7 @@ def home(request):
                         .sort_values("amount_value", ascending=False)
                     )
                     context["clients_html"] = clients.to_html(
-                        classes="table table-striped table-hover", index=False
+                        classes="table table-striped table-hover table-sm w-100", index=False
                     )
                     context["clients_chart"] = json.dumps(
                         {
@@ -86,7 +86,7 @@ def home(request):
                         .sort_values("amount_value", ascending=False)
                     )
                     context["projects_html"] = projects.to_html(
-                        classes="table table-striped table-hover", index=False
+                        classes="table table-striped table-hover table-sm w-100", index=False
                     )
 
                     services = (
@@ -95,7 +95,7 @@ def home(request):
                         .sort_values("amount_value", ascending=False)
                     )
                     context["services_html"] = services.to_html(
-                        classes="table table-striped table-hover", index=False
+                        classes="table table-striped table-hover table-sm w-100", index=False
                     )
                     context["services_chart"] = json.dumps(
                         {
