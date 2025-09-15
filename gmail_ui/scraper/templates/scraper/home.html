@@ -202,7 +202,7 @@
                         {% endif %}
                         <div class="d-flex flex-wrap gap-2 mb-2">
                             {% for b in badges %}
-                            <span class="badge {{ 'bg-success' if b.unlocked else 'bg-secondary' }}">{{ b.name }}</span>
+                            <span class="badge {% if b.unlocked %}bg-success{% else %}bg-secondary{% endif %}">{{ b.name }}</span>
                             {% endfor %}
                         </div>
                         {% if next_target %}
