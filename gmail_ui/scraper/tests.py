@@ -43,6 +43,7 @@ class HomeViewTests(TestCase):
             'amount_currency': ['USD', 'USD'],
             'subject': ['Invoice A', 'Invoice B'],
             'sender_name': ['Client One', ''],
+            'client_name': ['Client One', ''],
             'sender_email': ['client1@example.com', 'client2@example.com'],
         })
         mock_run_scraper.return_value = df
@@ -62,12 +63,15 @@ class HomeViewTests(TestCase):
         context = captured['context']
         table_html = context['table_html']
         self.assertIn('Client One', table_html)
+        self.assertIn('Unknown', table_html)
         self.assertNotIn('client1@example.com', table_html)
+        self.assertNotIn('client2@example.com', table_html)
 
         clients_chart = json.loads(context['clients_chart'])
         self.assertIn('Client One', clients_chart['labels'])
-        self.assertIn('client2@example.com', clients_chart['labels'])
+        self.assertIn('Unknown', clients_chart['labels'])
         self.assertNotIn('client1@example.com', clients_chart['labels'])
+        self.assertNotIn('client2@example.com', clients_chart['labels'])
 
 
 class AmountParsingTests(TestCase):

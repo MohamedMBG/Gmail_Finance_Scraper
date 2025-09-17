@@ -2,6 +2,8 @@ from pathlib import Path
 import json
 from datetime import date
 
+import pandas as pd
+
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import redirect, render
 from django.contrib.auth import logout
@@ -64,6 +66,9 @@ def home(request):
                     if "sender_name" not in df.columns:
                         df["sender_name"] = ""
                     df["sender_name"] = df["sender_name"].fillna("").astype(str).str.strip()
+                    if "client_name" not in df.columns:
+                        df["client_name"] = ""
+                    df["client_name"] = df["client_name"].fillna("").astype(str).str.strip()
                     if "sender_email" not in df.columns:
                         df["sender_email"] = ""
                     df["sender_email"] = df["sender_email"].fillna("").astype(str).str.strip()
@@ -72,15 +77,26 @@ def home(request):
                     df.loc[missing_name, "sender_name"] = df.loc[missing_name, "sender_email"]
                     df["sender_name"] = df["sender_name"].replace("", "Unknown")
 
+                    df["client_display"] = df["client_name"].replace("", pd.NA).fillna("Unknown")
+
                     display_df = df.copy()
                     name_idx = (
-                        display_df.columns.get_loc("sender_name")
-                        if "sender_name" in display_df.columns
+                        display_df.columns.get_loc("client_name")
+                        if "client_name" in display_df.columns
                         else 0
                     )
-                    display_df.insert(name_idx, "Client", display_df["sender_name"])
+                    display_df.insert(name_idx, "Client", display_df["client_display"])
                     display_df.drop(
-                        columns=[col for col in ["sender_name", "sender_email"] if col in display_df.columns],
+                        columns=[
+                            col
+                            for col in [
+                                "sender_name",
+                                "sender_email",
+                                "client_name",
+                                "client_display",
+                            ]
+                            if col in display_df.columns
+                        ],
                         inplace=True,
                     )
                     context["table_html"] = display_df.to_html(
@@ -95,11 +111,11 @@ def home(request):
                     df["project"] = df["subject"].apply(extract_project)
 
                     clients = (
-                        df.groupby("sender_name")["amount_value"].sum()
+                        df.groupby("client_display")["amount_value"].sum()
                         .reset_index()
                         .sort_values("amount_value", ascending=False)
                     )
-                    clients_display = clients.rename(columns={"sender_name": "Client"})
+                    clients_display = clients.rename(columns={"client_display": "Client"})
                     context["clients_html"] = clients_display.to_html(
                         classes="table table-striped table-hover table-sm w-100", index=False
                     )
