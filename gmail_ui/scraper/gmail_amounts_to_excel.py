@@ -409,6 +409,7 @@ def empty_results_df():
     return pd.DataFrame({
         "date": pd.Series(dtype="datetime64[ns]"),
         "sender_name": pd.Series(dtype="object"),
+        "client_name": pd.Series(dtype="object"),
         "sender_email": pd.Series(dtype="object"),
         "subject": pd.Series(dtype="object"),
         "amount_value": pd.Series(dtype="float"),
@@ -428,6 +429,10 @@ def load_existing_excel(path):
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
             if "service" not in df.columns:
                 df["service"] = ""
+            if "client_name" not in df.columns:
+                df["client_name"] = df.get("sender_name", "").apply(
+                    lambda x: x if looks_like_name(str(x)) else ""
+                )
             return df
         except Exception:
             pass
@@ -628,7 +633,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     continue
                 snippet = body_text[:200]
                 sender_name, sender_email = parse_from_header(from_h)
-                client_name = extract_client_name(body_text) or extract_client_name(subject)
+                client_name = extract_client_name(body_text)
                 if client_name:
                     sender_name = client_name
                 if is_blocked_sender(sender_email):
@@ -659,6 +664,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     rows.append({
                         "date": dt_local.replace(microsecond=0),
                         "sender_name": sender_name,
+                        "client_name": client_name or "",
                         "sender_email": sender_email,
                         "subject": subject,
                         "amount_value": a["value"],
@@ -724,7 +730,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 if is_promotional(body_text, subject):
                     continue
 
-                client_name = extract_client_name(body_text) or extract_client_name(subject)
+                client_name = extract_client_name(body_text)
                 if client_name:
                     sender_name = client_name
 
@@ -745,6 +751,7 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     rows.append({
                         "date": dt_local.replace(microsecond=0),
                         "sender_name": sender_name,
+                        "client_name": client_name or "",
                         "sender_email": sender_email,
                         "subject": subject,
                         "amount_value": a["value"],
