@@ -356,6 +356,7 @@ CLIENT_NAME_PATTERNS = [
     r"customer(?:\s+name)?\s*[:\-]\s*(.+)",
     r"nom\s+du\s+client\s*[:\-]\s*(.+)",
     r"nom\s+client\s*[:\-]\s*(.+)",
+    r"guest(?:\s+name)?\s*[:\-]\s*(.+)",
 ]
 
 
@@ -366,6 +367,12 @@ def clean_client_candidate(candidate: str) -> str:
             candidate = candidate.split(splitter)[0]
     candidate = re.split(r"\s{2,}", candidate)[0].strip()
     candidate = re.sub(r"\s+", " ", candidate)
+    candidate = re.sub(
+        r"\b(property|check[- ]?in|check[- ]?out|arrival|departure)\b.*",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    )
     candidate = candidate.strip("-:;|. ")
     return candidate.strip()
 

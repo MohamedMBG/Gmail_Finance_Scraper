@@ -111,3 +111,13 @@ class ClientNameExtractionTests(TestCase):
         Amount: 300 USD
         """
         self.assertIsNone(extract_client_name(body))
+
+    def test_extracts_guest_name_from_reservation_email(self):
+        body = """
+        Hi Mohammed Kodidji,
+        Good news — you've got a new reservation!
+        Guest: Hamid Aberkane Property: Your apartment (Downtown)
+        Check-in: 2024-04-10
+        Check-out: 2024-04-12
+        """
+        self.assertEqual(extract_client_name(body), 'Hamid Aberkane')
