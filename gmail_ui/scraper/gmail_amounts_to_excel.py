@@ -350,6 +350,58 @@ def parse_from_header(from_header):
         return "", from_header.strip()
     return from_header.strip(), ""
 
+
+CLIENT_NAME_PATTERNS = [
+    r"client(?:\s+name)?\s*[:\-]\s*(.+)",
+    r"customer(?:\s+name)?\s*[:\-]\s*(.+)",
+    r"nom\s+du\s+client\s*[:\-]\s*(.+)",
+    r"nom\s+client\s*[:\-]\s*(.+)",
+]
+
+
+def clean_client_candidate(candidate: str) -> str:
+    candidate = candidate.strip().strip("-:;|")
+    for splitter in [" - ", " – ", " | ", "/", ";", ","]:
+        if splitter in candidate:
+            candidate = candidate.split(splitter)[0]
+    candidate = re.split(r"\s{2,}", candidate)[0].strip()
+    candidate = re.sub(r"\s+", " ", candidate)
+    candidate = candidate.strip("-:;|. ")
+    return candidate.strip()
+
+
+def looks_like_name(text: str) -> bool:
+    if not text:
+        return False
+    if "@" in text or len(text) > 80:
+        return False
+    letters = sum(ch.isalpha() for ch in text)
+    return letters >= 2
+
+
+def extract_client_name(text: str) -> str | None:
+    if not text:
+        return None
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for line in lines:
+        for pattern in CLIENT_NAME_PATTERNS:
+            m = re.search(pattern, line, flags=re.IGNORECASE)
+            if m:
+                candidate = clean_client_candidate(m.group(1))
+                if re.search(r"\bclient\b", candidate, flags=re.IGNORECASE):
+                    continue
+                if looks_like_name(candidate):
+                    return candidate
+
+    for idx, line in enumerate(lines[:-1]):
+        if re.fullmatch(r"client(?:\s+name)?", line, flags=re.IGNORECASE):
+            candidate = clean_client_candidate(lines[idx + 1])
+            if looks_like_name(candidate):
+                return candidate
+
+    return None
+
 def gmail_link(message_id):
     return f"https://mail.google.com/mail/u/0/#inbox/{message_id}"
 
@@ -576,6 +628,9 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                     continue
                 snippet = body_text[:200]
                 sender_name, sender_email = parse_from_header(from_h)
+                client_name = extract_client_name(body_text) or extract_client_name(subject)
+                if client_name:
+                    sender_name = client_name
                 if is_blocked_sender(sender_email):
                     continue
 
@@ -668,6 +723,10 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 body_text = decode_body(payload)
                 if is_promotional(body_text, subject):
                     continue
+
+                client_name = extract_client_name(body_text) or extract_client_name(subject)
+                if client_name:
+                    sender_name = client_name
 
                 text_for_amounts = f"{subject}\n{body_text}"
                 service_type = detect_service(text_for_amounts)

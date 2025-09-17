@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from .views import home
-from .gmail_amounts_to_excel import extract_amounts
+from .gmail_amounts_to_excel import extract_amounts, extract_client_name
 
 
 class HomeViewTests(TestCase):
@@ -82,3 +82,28 @@ class AmountParsingTests(TestCase):
             self.assertEqual(len(amts), 1)
             self.assertEqual(amts[0]['value'], 8000.0)
             self.assertEqual(amts[0]['currency'], 'USD')
+
+
+class ClientNameExtractionTests(TestCase):
+    def test_extracts_name_after_label(self):
+        body = """
+        Invoice details
+        Client Name: John Doe
+        Amount: 2500 USD
+        """
+        self.assertEqual(extract_client_name(body), 'John Doe')
+
+    def test_extracts_name_from_next_line(self):
+        body = """
+        Client
+        Jane Smith
+        Amount due: 500 EUR
+        """
+        self.assertEqual(extract_client_name(body), 'Jane Smith')
+
+    def test_returns_none_when_no_name(self):
+        body = """
+        Invoice for services rendered
+        Amount: 300 USD
+        """
+        self.assertIsNone(extract_client_name(body))
