@@ -1,3 +1,6 @@
+import json
+
+from django.http import HttpResponse
 from django.test import RequestFactory, TestCase
 from unittest.mock import patch
 import pandas as pd
@@ -30,6 +33,41 @@ class HomeViewTests(TestCase):
         request2.session = request1.session
         home(request2)
         self.assertEqual(request2.session['total_amount'], 30)
+
+    @patch('scraper.views.render')
+    @patch('scraper.views.run_scraper')
+    @patch('scraper.views.is_connected', return_value=True)
+    def test_client_name_preferred_over_email(self, mock_is_connected, mock_run_scraper, mock_render):
+        df = pd.DataFrame({
+            'amount_value': [100, 200],
+            'amount_currency': ['USD', 'USD'],
+            'subject': ['Invoice A', 'Invoice B'],
+            'sender_name': ['Client One', ''],
+            'sender_email': ['client1@example.com', 'client2@example.com'],
+        })
+        mock_run_scraper.return_value = df
+
+        captured = {}
+
+        def render_side_effect(request, template_name, context):
+            captured['context'] = context
+            return HttpResponse('ok')
+
+        mock_render.side_effect = render_side_effect
+
+        request = self.factory.post('/')
+        request.session = {}
+        home(request)
+
+        context = captured['context']
+        table_html = context['table_html']
+        self.assertIn('Client One', table_html)
+        self.assertNotIn('client1@example.com', table_html)
+
+        clients_chart = json.loads(context['clients_chart'])
+        self.assertIn('Client One', clients_chart['labels'])
+        self.assertIn('client2@example.com', clients_chart['labels'])
+        self.assertNotIn('client1@example.com', clients_chart['labels'])
 
 
 class AmountParsingTests(TestCase):
