@@ -60,7 +60,30 @@ def home(request):
             try:
                 df = run_scraper()
                 if not df.empty:
-                    context["table_html"] = df.to_html(
+                    df = df.copy()
+                    if "sender_name" not in df.columns:
+                        df["sender_name"] = ""
+                    df["sender_name"] = df["sender_name"].fillna("").astype(str).str.strip()
+                    if "sender_email" not in df.columns:
+                        df["sender_email"] = ""
+                    df["sender_email"] = df["sender_email"].fillna("").astype(str).str.strip()
+
+                    missing_name = df["sender_name"] == ""
+                    df.loc[missing_name, "sender_name"] = df.loc[missing_name, "sender_email"]
+                    df["sender_name"] = df["sender_name"].replace("", "Unknown")
+
+                    display_df = df.copy()
+                    name_idx = (
+                        display_df.columns.get_loc("sender_name")
+                        if "sender_name" in display_df.columns
+                        else 0
+                    )
+                    display_df.insert(name_idx, "Client", display_df["sender_name"])
+                    display_df.drop(
+                        columns=[col for col in ["sender_name", "sender_email"] if col in display_df.columns],
+                        inplace=True,
+                    )
+                    context["table_html"] = display_df.to_html(
                         classes="table table-striped table-hover table-sm w-100", index=False
                     )
                     totals = df.groupby("amount_currency")["amount_value"].sum().reset_index()
@@ -76,13 +99,14 @@ def home(request):
                         .reset_index()
                         .sort_values("amount_value", ascending=False)
                     )
-                    context["clients_html"] = clients.to_html(
+                    clients_display = clients.rename(columns={"sender_name": "Client"})
+                    context["clients_html"] = clients_display.to_html(
                         classes="table table-striped table-hover table-sm w-100", index=False
                     )
                     context["clients_chart"] = json.dumps(
                         {
-                            "labels": clients["sender_name"].tolist(),
-                            "values": clients["amount_value"].tolist(),
+                            "labels": clients_display["Client"].tolist(),
+                            "values": clients_display["amount_value"].tolist(),
                         }
                     )
 
