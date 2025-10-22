@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 from datetime import date
+from decimal import Decimal
 
 import pandas as pd
 
@@ -8,7 +9,22 @@ from django.http import FileResponse, HttpResponse
 from django.shortcuts import redirect, render
 from django.contrib.auth import logout
 
-from .gmail_amounts_to_excel import run_scraper
+from .forms import ContactForm, ExpenseForm, default_expense_initial
+from .data_utils import (
+    Contact,
+    Expense,
+    calculate_expense_totals,
+    load_contacts,
+    load_expenses,
+    save_contacts,
+    save_expenses,
+    today_iso,
+)
+from .gmail_amounts_to_excel import (
+    run_scraper,
+    load_existing_excel,
+    write_financial_summary,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 EXCEL_PATH = BASE_DIR.parent / "email_amounts.xlsx"
@@ -43,6 +59,26 @@ def extract_project(subject: str) -> str:
 def is_connected() -> bool:
     """Return True if an OAuth token file exists."""
     return any(TOKENS_DIR.glob("token-*.json"))
+
+
+def refresh_financial_summary() -> None:
+    """Regenerate the financial summary sheet when expenses change."""
+    if EXCEL_PATH.exists():
+        df = load_existing_excel(str(EXCEL_PATH))
+        write_financial_summary(EXCEL_PATH, df)
+
+
+def revenue_totals() -> dict[str, Decimal]:
+    """Return a mapping of currency to revenue total from the Excel file."""
+    if not EXCEL_PATH.exists():
+        return {}
+    df = load_existing_excel(str(EXCEL_PATH))
+    if df.empty or "amount_currency" not in df.columns:
+        return {}
+    totals = (
+        df.groupby("amount_currency")["amount_value"].sum().to_dict()
+    )
+    return {str(currency): Decimal(str(total)) for currency, total in totals.items()}
 
 
 def home(request):
@@ -181,6 +217,97 @@ def home(request):
     context["next_target"] = next_target
     context["next_badge"] = next_badge
     return render(request, "scraper/home.html", context)
+
+
+def expenses(request):
+    expenses_list = load_expenses()
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "delete":
+            try:
+                index = int(request.POST.get("index", "-1"))
+            except ValueError:
+                index = -1
+            if 0 <= index < len(expenses_list):
+                expenses_list.pop(index)
+                save_expenses(expenses_list)
+                refresh_financial_summary()
+            return redirect("expenses")
+
+        form = ExpenseForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            expense = Expense(
+                date=(data["date"].isoformat() if data["date"] else today_iso()),
+                category=data["category"],
+                description=data.get("description", ""),
+                amount=data["amount"],
+                currency=data["currency"],
+            )
+            expenses_list.append(expense)
+            save_expenses(expenses_list)
+            refresh_financial_summary()
+            return redirect("expenses")
+        expense_form = form
+    else:
+        expense_form = ExpenseForm(initial=default_expense_initial())
+
+    expense_totals = calculate_expense_totals(expenses_list)
+    revenue = revenue_totals()
+    currencies = sorted(set(expense_totals) | set(revenue))
+    net_profit = {
+        currency: revenue.get(currency, Decimal("0")) - expense_totals.get(currency, Decimal("0"))
+        for currency in currencies
+    }
+
+    context = {
+        "form": expense_form,
+        "expenses": list(enumerate(expenses_list)),
+        "expense_totals": sorted(expense_totals.items()),
+        "revenue_totals": sorted(revenue.items()),
+        "net_profit": sorted(net_profit.items()),
+        "has_excel": EXCEL_PATH.exists(),
+    }
+    return render(request, "scraper/expenses.html", context)
+
+
+def contacts(request):
+    contact_list = load_contacts()
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "delete":
+            try:
+                index = int(request.POST.get("index", "-1"))
+            except ValueError:
+                index = -1
+            if 0 <= index < len(contact_list):
+                contact_list.pop(index)
+                save_contacts(contact_list)
+            return redirect("contacts")
+
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            contact = Contact(
+                name=data["name"],
+                company=data.get("company", ""),
+                category=data["category"],
+                phone=data["phone"],
+                email=data.get("email", ""),
+                notes=data.get("notes", ""),
+            )
+            contact_list.append(contact)
+            save_contacts(contact_list)
+            return redirect("contacts")
+        contact_form = form
+    else:
+        contact_form = ContactForm()
+
+    context = {
+        "form": contact_form,
+        "contacts": list(enumerate(contact_list)),
+    }
+    return render(request, "scraper/contacts.html", context)
 
 
 def download_excel(request):
