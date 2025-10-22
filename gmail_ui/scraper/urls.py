@@ -7,4 +7,6 @@ urlpatterns = [
     path('download/', views.download_excel, name='download_excel'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('expenses/', views.expenses, name='expenses'),
+    path('contacts/', views.contacts, name='contacts'),
 ]

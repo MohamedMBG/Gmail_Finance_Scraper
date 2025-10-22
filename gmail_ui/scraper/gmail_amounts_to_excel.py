@@ -14,6 +14,7 @@ import json
 import getpass
 import imaplib
 import email
+from decimal import Decimal
 from email.header import decode_header, make_header
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -28,6 +29,11 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
+try:
+    from .data_utils import load_expenses, calculate_expense_totals
+except ImportError:  # pragma: no cover - allows running as a standalone script
+    from data_utils import load_expenses, calculate_expense_totals
 
 # ---- Excel styling imports (openpyxl) ----
 from openpyxl import load_workbook, Workbook
@@ -601,6 +607,72 @@ def write_totals_sheet(path: str | Path, df: pd.DataFrame) -> None:
     wb.save(path)
 
 
+def write_financial_summary(path: str | Path, df: pd.DataFrame) -> None:
+    """Write revenue, expenses, and net profit per currency to the workbook."""
+    expenses = load_expenses()
+    expense_totals = calculate_expense_totals(expenses)
+
+    if df.empty or "amount_currency" not in df.columns:
+        revenue_totals = {}
+    else:
+        raw_totals = df.groupby("amount_currency")["amount_value"].sum().to_dict()
+        revenue_totals = {
+            str(currency): Decimal(str(total)) for currency, total in raw_totals.items()
+        }
+
+    currencies = sorted(set(expense_totals) | set(revenue_totals))
+    rows = []
+    for currency in currencies:
+        revenue = revenue_totals.get(currency, Decimal("0"))
+        expense = expense_totals.get(currency, Decimal("0"))
+        net = revenue - expense
+        rows.append(
+            {
+                "Currency": currency,
+                "Revenue": float(revenue),
+                "Expenses": float(expense),
+                "Net Profit": float(net),
+            }
+        )
+
+    if not rows:
+        summary_df = pd.DataFrame(columns=["Currency", "Revenue", "Expenses", "Net Profit"])
+    else:
+        summary_df = pd.DataFrame(rows, columns=["Currency", "Revenue", "Expenses", "Net Profit"])
+
+    if not Path(path).exists():
+        return
+
+    with pd.ExcelWriter(path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
+        summary_df.to_excel(writer, sheet_name="financial_summary", index=False)
+
+    wb = load_workbook(path)
+    ws = wb["financial_summary"]
+
+    ws.freeze_panes = "A2"
+    if ws.max_row >= 1:
+        for cell in ws[1]:
+            cell.font = Font(bold=True)
+            cell.fill = HEADER_FILL
+            cell.border = THIN_BORDER
+
+    for row in range(2, ws.max_row + 1):
+        for col in range(2, ws.max_column + 1):
+            ws.cell(row=row, column=col).number_format = '#,##0.00'
+            ws.cell(row=row, column=col).border = THIN_BORDER
+
+    last_col_letter = ws.cell(row=1, column=ws.max_column).column_letter if ws.max_column else "A"
+    ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+
+    data = list(ws.iter_rows(values_only=True))
+    for col_idx in range(1, ws.max_column + 1):
+        column_values = [row[col_idx - 1] for row in data] if data else []
+        width = best_fit_width(column_values)
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = width
+
+    wb.save(path)
+
+
 # ---------- Simple analytics ----------
 def most_profitable_service(df: pd.DataFrame) -> str | None:
     """Return the service with the highest total amount in the dataframe."""
@@ -694,8 +766,11 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 merged.to_excel(EXCEL_PATH, index=False)
                 style_excel(EXCEL_PATH)
                 write_totals_sheet(EXCEL_PATH, merged)
+                write_financial_summary(EXCEL_PATH, merged)
             else:
                 merged = df
+                if Path(EXCEL_PATH).exists():
+                    write_financial_summary(EXCEL_PATH, merged)
             imap.logout()
         else:
             creds, account_email = load_creds_for_account(account)
@@ -781,8 +856,11 @@ def run_scraper(days=180, query=None, take=None, pick="max", account=None, email
                 merged.to_excel(EXCEL_PATH, index=False)
                 style_excel(EXCEL_PATH)
                 write_totals_sheet(EXCEL_PATH, merged)
+                write_financial_summary(EXCEL_PATH, merged)
             else:
                 merged = df
+                if Path(EXCEL_PATH).exists():
+                    write_financial_summary(EXCEL_PATH, merged)
         top_service = most_profitable_service(merged)
         if top_service:
             print(f"Most profitable service: {top_service}")
